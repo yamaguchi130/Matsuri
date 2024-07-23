@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: dd21d5e6bbd80444ca24f586599b765a
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences:
+  - playerPrefab: {fileID: 4772303054904479890, guid: ac19bffa9145b2e4e92e3e76b6b37bac,
+      type: 3}
+  - oniPrefab: {fileID: 4772303054904479890, guid: 9a833b1b53ad9d841b6f028d5e766bf2,
+      type: 3}
+  - oniEffectPrefab: {fileID: 5362952499871194892, guid: c5aca82a130e5e846880c289bd761d8e,
+      type: 3}
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
