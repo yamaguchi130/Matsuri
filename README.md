@@ -30,6 +30,9 @@
 
 ### 鬼ごっこ
 
+https://github.com/user-attachments/assets/f46031a3-a750-4dbd-a6b0-29eead5de350
+
+
 joystickの操作だけで、ゲームを楽しめます！
 
 
