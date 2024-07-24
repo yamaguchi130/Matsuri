@@ -2,13 +2,14 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using Photon.Pun;
+using Photon.Realtime;
 using ExitGames.Client.Photon;
 using Cinemachine;
 
 /// <summary>
 /// ドッヂボール用のボールを制御するクラス
 /// </summary>
-public class DodgeBallScript : MonoBehaviourPun
+public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
 {
     // Animatorをanimという変数で定義する
     private Animator anim; 
@@ -22,11 +23,11 @@ public class DodgeBallScript : MonoBehaviourPun
     [SerializeField]
     public bool move = true;
 
-    // 最後に投げたプレイヤーのViewID
-    private int lastThrownPlayerViewID = -1;
-
     // 敵チームのプライヤーオブジェクトのViewIDリスト
     object enemyTeamViewIDs;
+
+    // 最後に投げたプレイヤーのViewID
+    public int lastThrownPlayerViewID = -1;
 
     // プレイヤーがボールを持ってるかどうかのフラグ
     public bool hasBall = false;
@@ -183,5 +184,42 @@ public class DodgeBallScript : MonoBehaviourPun
         GameObject lastThrownPlayerObject = PhotonView.Find(lastThrownPlayerViewID).gameObject;
         DodgeBallPlayerScript lastThrownPlayerScript = lastThrownPlayerObject.GetComponent<DodgeBallPlayerScript>();
         lastThrownPlayerScript.ReviveInField();
+    }
+
+    // スクリプトが有効になったときに呼び出される
+    // このオブジェクトをコールバックターゲットとして登録します
+    private void OnEnable()
+    {
+        PhotonNetwork.AddCallbackTarget(this);
+    }
+
+    // スクリプトが無効になったときに呼び出される
+    // このオブジェクトをコールバックターゲットから解除します
+    private void OnDisable()
+    {
+        PhotonNetwork.RemoveCallbackTarget(this);
+    }
+
+    // 所有権のリクエストがあったときに呼び出される
+    public void OnOwnershipRequest(PhotonView targetView, Player requestingPlayer)
+    {
+        Debug.Log("ボールの所有権のリクエストがありました。");
+        if (PhotonNetwork.IsMasterClient)
+        {
+            // マスタークライアントが所有権を渡すかどうかを決定します
+            targetView.TransferOwnership(requestingPlayer);
+        }
+    }
+
+    // 所有権が転送されたときに呼び出される
+    public void OnOwnershipTransfered(PhotonView targetView, Player previousOwner)
+    {
+        Debug.Log($"ボールの所有権を:{targetView.Owner.NickName}に転送しました");
+    }
+
+    // 所有権の転送が失敗したときに呼び出される
+    public void OnOwnershipTransferFailed(PhotonView targetView, Player senderOfFailedRequest)
+    {
+        Debug.Log("ボールの所有権の転送に失敗しました。");
     }
 }

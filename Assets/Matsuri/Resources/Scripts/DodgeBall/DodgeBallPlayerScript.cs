@@ -262,8 +262,8 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
         float vertical = inputMove.Vertical;
         float horizontal = inputMove.Horizontal;
 
-        // 後ろ方向の入力があった場合はカメラ位置の移動のみを行う
-        if (vertical < 0)
+        // 後ろ方向（180度±45度）の入力があった場合はカメラ位置の移動のみを行う
+        if (vertical < 0 && Mathf.Abs(horizontal) <= Mathf.Abs(vertical) * Mathf.Tan(Mathf.Deg2Rad * 45))
         {
             cameraController.isBack = true;
             anim.SetFloat("speed", 0f);
@@ -300,10 +300,10 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
         }
     }
 
-    // オブジェクトの衝突時
+    // オブジェクトの衝突時に呼び出される
     void OnCollisionEnter(Collision collision)
     {
-        // ボールと衝突したら
+        // ボールと衝突した場合
         if (collision.gameObject.CompareTag("Ball"))
         {
             // ボールのスクリプトを取得
@@ -313,30 +313,66 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
             Vector3 collisionDirection = collision.contacts[0].point - transform.position;
             float angle = Vector3.Angle(transform.forward, collisionDirection);
 
-            // Hit判定なしのボールなら
-            if (!ballScript.isHitEnabled)
+            // ボールを持つべきかを判定し、必要ならばボールを持つ
+            if (ShouldHoldBall(collision, angle))
             {
-                // ボールを持つ
                 HoldBall(collision);
             }
-            // Hit判定ありのボールかつ、キャッチボタン押下中で、全面での衝突なら
-            else if (ballScript.isHitEnabled && isCatching && angle < 45f) 
-            {
-                // ボールを持つ
-                HoldBall(collision);
-            }
-            // それ以外は、Hit判定ありのボールを当てられたとする
             else
             {
-                // 自身が内野にいるとき
-                if(isInfielder)
-                {
-                    // 自身が外野に移動する
-                    isInfielder = false;
-                    SetPosition();
-                }
+                // 自身が外野に移動する
+                isInfielder = false;
+                SetPosition();
             }
         }
+    }
+
+    // ボールを持つべきかどうかを判定する
+    private bool ShouldHoldBall(Collision collision, float angle)
+    {
+        // Hit判定なしのボールの場合
+        if (!ballScript.isHitEnabled)
+        {
+            return true;
+        }
+
+        // 最後にボールを持っていたのが味方チームの場合
+        if (IsTeammateHoldingLast() && !IsSamePlayerHoldingLast())
+        {
+            return true;
+        }
+
+        // 最後にボールを持っていたのが敵チームで、キャッチボタン押下中で、全面での衝突なら
+        if (IsEnemyHoldingLast() && isCatching && angle < 45f)
+        {
+            return true;
+        }
+
+        // 自身が外野にいるとき
+        if (!isInfielder)
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    // 最後にボールを持っていたのが味方チームかどうかを判定する
+    private bool IsTeammateHoldingLast()
+    {
+        return ballScript.isHitEnabled && this.photonView.ViewID != ballScript.lastThrownPlayerViewID;
+    }
+
+    // 最後にボールを持っていたのが自身であるかどうかを判定する
+    private bool IsSamePlayerHoldingLast()
+    {
+        return this.photonView.ViewID == ballScript.lastThrownPlayerViewID;
+    }
+
+    // 最後にボールを持っていたのが敵チームかどうかを判定する
+    private bool IsEnemyHoldingLast()
+    {
+        return ballScript.isHitEnabled && this.photonView.ViewID != ballScript.lastThrownPlayerViewID;
     }
 
     // ボールを持つ
@@ -345,27 +381,20 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
         // 衝突したプレイヤーオブジェクトのView取得
         PhotonView collisionView = collision.collider.GetComponent<PhotonView>();
 
-        if (collisionView != null && !collisionView.IsMine)
+        if (collisionView != null && !collisionView.IsMine && collisionView.gameObject.CompareTag("Ball"))
         {
             // 所有権をリクエスト
             collisionView.RequestOwnership();
             Debug.Log("ボールの所有権をリクエストしました");
+
+            // ボール位置を、右の手のひらに設定
+            collisionView.transform.position = rightHandBone.position;
+            collisionView.transform.SetParent(rightHandBone);
+            ballScript.isHitEnabled = true;
+
+            Debug.Log($"{PhotonNetwork.LocalPlayer.UserId} が、ボールを所持しました。");
         }
     }
-
-    // 所有権移行のコールバック
-    // public override void OnOwnershipTransfered(PhotonView targetView, Player previousOwner)
-    // {
-    //     if (targetView != null && targetView.IsMine && targetView.gameObject.CompareTag("Ball"))
-    //     {
-    //         // ボール位置を、右の手のひらに設定
-    //         targetView.transform.position = rightHandBone.position;
-    //         targetView.transform.SetParent(rightHandBone);
-    //         ballScript.isHitEnabled = true;
-
-    //         Debug.Log($"{PhotonNetwork.LocalPlayer.UserId} が、ボールを所持しました。");
-    //     }
-    // }
 
     private IEnumerator CooldownRoutine()
     {

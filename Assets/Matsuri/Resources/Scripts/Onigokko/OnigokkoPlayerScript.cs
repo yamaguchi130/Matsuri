@@ -133,9 +133,9 @@ public class OnigokkoPlayerScript : MonoBehaviourPun
         // joystickの入力
         float vertical = inputMove.Vertical;
         float horizontal = inputMove.Horizontal;
-
-        // 後ろ方向の入力があった場合はカメラ位置の移動のみを行う
-        if (vertical < 0)
+        
+        // 後ろ方向（180度±45度）の入力があった場合はカメラ位置の移動のみを行う
+        if (vertical < 0 && Mathf.Abs(horizontal) <= Mathf.Abs(vertical) * Mathf.Tan(Mathf.Deg2Rad * 45))
         {
             cameraController.isBack = true;
             anim.SetFloat("speed", 0f);
