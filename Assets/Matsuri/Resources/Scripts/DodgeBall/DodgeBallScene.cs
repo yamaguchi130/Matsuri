@@ -51,8 +51,10 @@ public class DodgeBallScene : MonoBehaviourPunCallbacks
     DodgeBallTimerDisplay timerDisplay;
     // スコアスクリプト
     DodgeBallScore scoreScript;
-    // プレイヤーオブジェクト
-    GameObject playerObject;
+    // 自身のプレイヤーオブジェクト
+    GameObject myPlayerObject;
+    // 自身のプレイヤースクリプト
+    DodgeBallPlayerScript myPlayerScript;
     // ボールオブジェクト
     GameObject ballObject;
 
@@ -101,7 +103,7 @@ public class DodgeBallScene : MonoBehaviourPunCallbacks
         Debug.Log("ルームに入室しました");
         // 非同期で、初期位置にオブジェクト生成
         Vector3 spawnPosition = GetRandomPosition(initialMinPosition, initialMaxPosition);
-        playerObject = PhotonNetwork.Instantiate(playerPrefab.name, spawnPosition, randomRotation);
+        myPlayerObject = PhotonNetwork.Instantiate(playerPrefab.name, spawnPosition, randomRotation);
         Debug.Log($"{PhotonNetwork.LocalPlayer.UserId}の、プレイヤーオブジェクトを生成しました。");
     }
 
@@ -118,7 +120,7 @@ public class DodgeBallScene : MonoBehaviourPunCallbacks
     {
         Debug.Log("ルームから退室しました");
         // 非同期でオブジェクト削除
-        PhotonNetwork.Destroy(playerObject);
+        PhotonNetwork.Destroy(myPlayerObject);
     }
 
     // 他のプレイヤーが、ルームに参加したときに呼び出される
@@ -166,6 +168,11 @@ public class DodgeBallScene : MonoBehaviourPunCallbacks
     // ゲームスタート処理を行うコルーチン
     IEnumerator StartGameCoroutine()
     {
+        // これがBチームのプレイヤーもtrueになってる
+        Debug.Log($"Aチーム:{myPlayerScript.isAteam}でスタートします。"); 
+        // 自身のプレイヤーオブジェクトの配置設定
+        myPlayerScript.SetPosition();
+
         // タイマースクリプト取得
         GameObject timerPanel = GameObject.Find("TimerPanel");
         if (timerPanel == null)
@@ -203,25 +210,8 @@ public class DodgeBallScene : MonoBehaviourPunCallbacks
         timerDisplay.isStartGame = true;
         scoreScript.isStartGame = true;
 
-        // プレイヤーオブジェクトのスクリプトを取得
-        object playerObjectIDs;
-        if (!PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue("playerObjectIDs", out playerObjectIDs))
-        {
-            Debug.LogError("プレイヤーオブジェクトが見つかりません。");
-            yield break;
-        }
-
-        // プレイヤーを移動可能にする
-        int[] ids = (int[])playerObjectIDs;
-        foreach (int id in ids)
-        {
-            PhotonView view = PhotonView.Find(id);
-            if (view != null)
-            {
-                DodgeBallPlayerScript playerScript = view.gameObject.GetComponent<DodgeBallPlayerScript>();
-                playerScript.move = true;
-            }
-        }
+        // 自身のプレイヤーオブジェクトを移動可能に設定
+        myPlayerScript.move = true;
 
         // マスタークライアントでのみ実行
         if (PhotonNetwork.IsMasterClient)
@@ -258,7 +248,7 @@ public class DodgeBallScene : MonoBehaviourPunCallbacks
         Debug.Log($"{seconds} seconds have passed");
     }
 
-    // チームの選定
+    // チームの選定（マスタークライアントでのみ行う）
     private void SelectTeam()
     {
         // 全プレイヤーオブジェクトを取得
@@ -284,38 +274,32 @@ public class DodgeBallScene : MonoBehaviourPunCallbacks
         {
             GameObject playerObj = playerObjs[i];
             PhotonView view = playerObj.GetComponent<PhotonView>();
-            DodgeBallPlayerScript playerScript = playerObj.GetComponent<DodgeBallPlayerScript>();
 
-            // 交互に割り当て
-            if (i % 2 == 0)
+            bool isAteam = (i % 2 == 0);
+            bool isInfielder = true; // デフォルトはtrueで設定
+
+            // 各チームに少なくとも一人の外野プレイヤーを含める
+            if (playerObjs.Length >= 4)
             {
-                // Aチームに割り当て
-                playerScript.isAteam = true;
-                aTeamViewIDs.Add(view.ViewID);
-
-                // プレイヤー数が4人以上の場合、各チームに isInfielder が false のプレイヤーを一名含める
-                if (!aTeamOutfielderSet && !playerScript.isInfielder && playerObjs.Length >= 4)
+                if (isAteam && !aTeamOutfielderSet)
                 {
-                    playerScript.isInfielder = false;
+                    isInfielder = false;
                     aTeamOutfielderSet = true;
                 }
-            }
-            else
-            {
-                // Bチームに割り当て
-                playerScript.isAteam = false;
-                bTeamViewIDs.Add(view.ViewID);
-
-                // プレイヤー数が4人以上の場合、各チームに isInfielder が false のプレイヤーを一名含める
-                if (!bTeamOutfielderSet && !playerScript.isInfielder && playerObjs.Length >= 4)
+                else if (!isAteam && !bTeamOutfielderSet)
                 {
-                    playerScript.isInfielder = false;
+                    isInfielder = false;
                     bTeamOutfielderSet = true;
                 }
             }
 
-            // プレイヤーオブジェクトの配置設定
-            playerScript.SetPosition();
+            // カスタムプロパティを設定してプレイヤーに適用
+            ExitGames.Client.Photon.Hashtable props = new ExitGames.Client.Photon.Hashtable
+            {
+                {"IsAteam", isAteam},
+                {"IsInfielder", isInfielder}
+            };
+            view.Owner.SetCustomProperties(props);           
         }
 
         // ルーム内のチームのViewIDをカスタムプロパティとして保持
@@ -327,31 +311,39 @@ public class DodgeBallScene : MonoBehaviourPunCallbacks
         Debug.Log("AチームのプレイヤーViewID一覧: " + string.Join(", ", aTeamViewIDs));
         Debug.Log("BチームのプレイヤーViewID一覧: " + string.Join(", ", bTeamViewIDs));
 
-        // すべてのプレイヤーオブジェクトに対して処理
-        foreach (GameObject playerObj in playerObjs)
-        {
-            PhotonView view = playerObj.GetComponent<PhotonView>();
-            DodgeBallPlayerScript playerScript = playerObj.GetComponent<DodgeBallPlayerScript>();
-
-            if (bTeamViewIDs.Contains(view.ViewID))
-            {
-                // Bチームの設定
-                playerScript.isAteam = false;
-            }
-        }
-
         // プレイヤーオブジェクトの色変更（マスタークライアント&それ以外のクライアントで、通信を介してスクリプト実行）
         photonView.RPC(nameof(ControllColor), RpcTarget.AllViaServer, aTeamViewIDs.ToArray(), bTeamViewIDs.ToArray());
+    }
+
+    // プレイヤーのカスタムプロパティが変更されたとき
+    public override void OnPlayerPropertiesUpdate(Player targetPlayer, ExitGames.Client.Photon.Hashtable changedProps)
+    {
+        // 自身のプレイヤーオブジェクトのPhotonViewを検索
+        PhotonView view = myPlayerObject.GetComponent<PhotonView>();
+        // 自身のプレイヤーオブジェクトがターゲットなら
+        if (view.Owner == targetPlayer)
+        {
+            // チーム・内野or外野のプロパティの変更時
+            if (changedProps.ContainsKey("IsAteam") || changedProps.ContainsKey("IsInfielder"))
+            {
+                // 自身のプレイヤーのスクリプトを取得
+                myPlayerScript = myPlayerObject.GetComponent<DodgeBallPlayerScript>();
+                // チーム設定
+                myPlayerScript.isAteam = (bool)changedProps["IsAteam"];
+                // 内野/外野設定
+                myPlayerScript.isInfielder = (bool)changedProps["IsInfielder"];
+            }
+        }
     }
 
     // オブジェクトの色変更(全クライアントで実行) 
     [PunRPC]
     public void ControllColor(int[] aTeamViewIDs, int[] bTeamViewIDs)
-    {
-        // Aチームの設定
+    {   
+        // Aチームのカラー設定
         SetTeamColor(aTeamViewIDs, aTeamMaterial);
 
-        // Bチームの設定
+        // Bチームのカラー設定
         SetTeamColor(bTeamViewIDs, bTeamMaterial);
     }
 

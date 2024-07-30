@@ -18,6 +18,8 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
     private FloatingJoystick inputMove;
     // シーン管理用オブジェクト
     private GameObject photonControllerGameObject;
+    // シーン管理スクリプト
+    private DodgeBallScene dodgeBallSceneScript;
     // 仮想カメラオブジェクト
     private GameObject virtualCameraGameObject;
     // カメラコントローラ
@@ -75,9 +77,18 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
 
     // ボールのスクリプト
     DodgeBallScript ballScript;
+    // ボールのView
+    PhotonView ballView;
 
     // 外野の時間をカウント  
     private float outfieldTime = 0f;
+
+    // GUIのキャンバス
+    Canvas canvas;
+    // ボールを持ってない場合のパネル
+    private GameObject whenNotHoldingTheBallPanel;
+    // ボールを持っている場合のパネル
+    private GameObject whenHoldingTheBallPanel;
 
 
     // アタッチしたゲームオブジェクトが有効になったとき
@@ -97,6 +108,12 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
         if (photonControllerGameObject == null)
         {
             Debug.LogError("PhotonControllerが見つかりません");
+        }
+        // シーン管理スクリプトの取得
+        dodgeBallSceneScript = photonControllerGameObject.GetComponent<DodgeBallScene>();
+        if (dodgeBallSceneScript == null)
+        {
+            Debug.LogError("dodgeBallSceneScriptが見つかりません");
         }
 
         // VirtualCameraの設定
@@ -140,6 +157,31 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
         {
             Debug.LogError("右手のボーンが見つかりません");
         }
+
+        canvas = GetComponentInChildren<Canvas>();
+        if (canvas == null)
+        {
+            Debug.LogError("Canvasのコンポーネントが見つかりません");
+        }
+
+        // ボールを持っているときのパネル
+        Transform whenHoldingTheBallPanelTransform = canvas.transform.Find("WhenHoldingTheBallPanel");
+        whenHoldingTheBallPanel = whenHoldingTheBallPanelTransform.gameObject;
+        if (whenHoldingTheBallPanel == null)
+        {
+            Debug.LogError("WhenHoldingTheBallPanelが見つかりません");
+        }
+
+        // ボールを持ってないときのパネル
+        Transform whenNotHoldingTheBallPanelTransform = canvas.transform.Find("WhenNotHoldingTheBallPanel");
+        whenNotHoldingTheBallPanel = whenNotHoldingTheBallPanelTransform.gameObject;
+        if (whenNotHoldingTheBallPanel == null)
+        {
+            Debug.LogError("WhenNotHoldingTheBallPanelが見つかりません");
+        }
+
+        // ボールを持っていないときのパネルを表示させる。
+        whenNotHoldingTheBallPanel.SetActive(true);
     }
 
     // 配置設定
@@ -159,6 +201,7 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
                     Random.Range(aTeamInfielderMinPosition.z, aTeamInfielderMaxPosition.z)
                 );
                 newRotation = southInitialRotation;
+                Debug.Log($"{PhotonNetwork.LocalPlayer.UserId} がAチームの内野に設定されました。");
             }
             else
             {
@@ -169,6 +212,7 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
                     Random.Range(aTeamOutfielderMinPosition.z, aTeamOutfielderMaxPosition.z)
                 );
                 newRotation = northInitialRotation;
+                Debug.Log($"{PhotonNetwork.LocalPlayer.UserId} がAチームの外野に設定されました。");
             }
         }
         else
@@ -182,6 +226,7 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
                     Random.Range(bTeamInfielderMinPosition.z, bTeamInfielderMaxPosition.z)
                 );
                 newRotation = northInitialRotation;
+                Debug.Log($"{PhotonNetwork.LocalPlayer.UserId} がBチームの内野に設定されました。");
             }
             else
             {
@@ -192,6 +237,7 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
                     Random.Range(bTeamOutfielderMinPosition.z, bTeamOutfielderMaxPosition.z)
                 );
                 newRotation = southInitialRotation;
+                Debug.Log($"{PhotonNetwork.LocalPlayer.UserId} がBチームの外野に設定されました。");
             }
         }
 
@@ -230,8 +276,21 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
             outfieldTime += Time.deltaTime;
             UpdateOutfieldTime();
         }
+        
+        // ボールViewが取得できてる場合
+        if (ballView != null)
+        {
+            // このスクリプトのプレイヤーオブジェクトが、ボールを持っている場合
+            if (ballView.transform.parent == rightHandBone)
+            {
+                Debug.Log($"{PhotonNetwork.LocalPlayer.UserId} がボールを持っています。");
+                // 毎フレーム、右手のボーンの位置を更新
+                ballView.transform.localPosition = rightHandBone.position;
+            }
+        }
     }
 
+    // 外野にいる時間の、ルームのカスタムプロパティを更新
     void UpdateOutfieldTime()
     {
         // 外野にいる時間をルームプロパティに更新
@@ -309,7 +368,7 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
             // ボールのスクリプトを取得
             ballScript = collision.collider.GetComponent<DodgeBallScript>();
 
-            // 衝突したのがこのオブジェクトの全面の場合
+            // 衝突したのがこのオブジェクトの全面かを判定するために、angleを設定
             Vector3 collisionDirection = collision.contacts[0].point - transform.position;
             float angle = Vector3.Angle(transform.forward, collisionDirection);
 
@@ -378,21 +437,48 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
     // ボールを持つ
     private void HoldBall(Collision collision)
     {
-        // 衝突したプレイヤーオブジェクトのView取得
-        PhotonView collisionView = collision.collider.GetComponent<PhotonView>();
+        // 衝突したボールオブジェクトのView取得
+        PhotonView ballView = collision.collider.GetComponent<PhotonView>();
 
-        if (collisionView != null && !collisionView.IsMine && collisionView.gameObject.CompareTag("Ball"))
+        // ボールのVIEWが取得できており、ボールのviewのオーナーが自分ではない場合
+        if (ballView == null)
         {
-            // 所有権をリクエスト
-            collisionView.RequestOwnership();
+            return;
+        }
+
+        // ボールの所有権がない場合
+        if (!ballView.IsMine)
+        {
+            // ボールの所有権をリクエスト
+            ballView.RequestOwnership();
             Debug.Log("ボールの所有権をリクエストしました");
+        }
 
-            // ボール位置を、右の手のひらに設定
-            collisionView.transform.position = rightHandBone.position;
-            collisionView.transform.SetParent(rightHandBone);
-            ballScript.isHitEnabled = true;
+        // ボール位置を、右の手のひらに設定
+        ballView.transform.SetParent(rightHandBone);
+        // ボールのヒット判定を有効にする
+        ballScript.isHitEnabled = true;
+        // ボールを持ってる判定にする
+        ballScript.hasBall = true;
+        // ボールを持っているパネルを表示
+        SetPanelBasedOnBallStatus(true);
+        Debug.Log($"{PhotonNetwork.LocalPlayer.UserId} が、ボールを所持しました。");
+    }
 
-            Debug.Log($"{PhotonNetwork.LocalPlayer.UserId} が、ボールを所持しました。");
+
+    // 指定されたパネルを表示し、他のパネルを非表示にするメソッド（なぜかボールを持ってないプレイヤーも更新される）
+    public void SetPanelBasedOnBallStatus(bool isHoldingBall)
+    {
+        // ボールを持ってなかったら
+        if (!isHoldingBall)
+        {
+            whenNotHoldingTheBallPanel.SetActive(true);
+            whenHoldingTheBallPanel.SetActive(false);
+        }
+        else
+        {
+            whenNotHoldingTheBallPanel.SetActive(false);
+            whenHoldingTheBallPanel.SetActive(true);
         }
     }
 
@@ -419,15 +505,30 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
 
     // ボールをストレートに投げる
     public void StraightThrowBall()
-    {}
+    {
+        // ボールを持ってない判定にする
+        ballScript.hasBall = false;
+        // ボールを持っていないときのパネル表示
+        SetPanelBasedOnBallStatus(false);
+    }
 
     // ボールをやまなりにパスする
     public void LobPass()
-    {}
+    {
+        // ボールを持ってない判定にする
+        ballScript.hasBall = false;
+        // ボールを持っていないときのパネル表示
+        SetPanelBasedOnBallStatus(false);
+    }
 
     // ボールを落とす
     public void DropBall()
-    {}
+    {
+        // ボールを持ってない判定にする
+        ballScript.hasBall = false;
+        // ボールを持っていないときのパネル表示
+        SetPanelBasedOnBallStatus(false);
+    }
 
     // キャッチボタン押下中
     public void StartCatching()

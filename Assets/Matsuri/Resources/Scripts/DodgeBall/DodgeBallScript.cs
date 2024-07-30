@@ -67,11 +67,19 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
     // 一定感覚（50回/秒）の呼び出し物理演算
     void FixedUpdate()
     {
-        // プレイヤーがボールを持ってなかったら
-        if(!hasBall)
+        // プレイヤーがボールを持ってたら
+        if(hasBall)
         {
+            // 重力、衝突無効を設定
+            rb.isKinematic = true;
+
             // ボールをリスポーンするかのチェック
             // StartCoroutine(ShouldRespawnBall());
+        }
+        else
+        {   
+            // 重力、衝突無効を設定しない
+            rb.isKinematic = false;
         }
 
     }
