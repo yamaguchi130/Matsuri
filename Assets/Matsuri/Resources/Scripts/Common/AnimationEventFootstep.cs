@@ -6,6 +6,7 @@ public class AnimationEventFootstep : MonoBehaviour
     [SerializeField]
     AudioClip footstepSound;
     
+    // スクリプトが有効になってから、最初のフレームの更新が行われる前に呼び出し
     void Start()
     {
         // シーン管理用オブジェクトの設定

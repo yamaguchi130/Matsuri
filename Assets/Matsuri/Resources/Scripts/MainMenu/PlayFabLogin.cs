@@ -30,6 +30,7 @@ public class PlayFabLogin : MonoBehaviour {
     // ログイン時に使うID
     private string _customID;
 
+    // スクリプトが有効になってから、最初のフレームの更新が行われる前に呼び出し
     public void Start() {
         AutoLogin();
     }

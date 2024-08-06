@@ -58,7 +58,12 @@ public class DodgeBallScene : MonoBehaviourPunCallbacks
     // ボールオブジェクト
     GameObject ballObject;
 
-    // オブジェクトがアクティブな場合の、初期処理
+    // プレイヤーオブジェクトをランダムにAチームとBチームに分ける為のリスト
+    List<int> aTeamViewIDs = new List<int>();
+    List<int> bTeamViewIDs = new List<int>();
+
+
+    // スクリプトが有効になってから、最初のフレームの更新が行われる前に呼び出し
     void Start()
     {
         // デフォルトの同期頻度（20秒/回）だと、他のプレイヤーがラグいため、調整した
@@ -147,9 +152,13 @@ public class DodgeBallScene : MonoBehaviourPunCallbacks
             // マスタークライアントでのみ実行
             if (PhotonNetwork.IsMasterClient)
             {
-                // 鬼の選定
+                // チームの割り振り
                 SelectTeam();
             }
+
+            // プレイヤーオブジェクトの色変更（マスタークライアント&それ以外のクライアントで、通信を介してスクリプト実行）
+            photonView.RPC(nameof(ControllColor), RpcTarget.AllViaServer, aTeamViewIDs.ToArray(), bTeamViewIDs.ToArray());
+            
             // ゲーム開始の処理をここに記述
             Debug.Log("すべてのプレイヤーが準備完了。ゲーム開始！");
 
@@ -248,7 +257,7 @@ public class DodgeBallScene : MonoBehaviourPunCallbacks
         Debug.Log($"{seconds} seconds have passed");
     }
 
-    // チームの選定（マスタークライアントでのみ行う）
+    // チームの選定
     private void SelectTeam()
     {
         // 全プレイヤーオブジェクトを取得
@@ -261,15 +270,11 @@ public class DodgeBallScene : MonoBehaviourPunCallbacks
         PhotonNetwork.CurrentRoom.SetCustomProperties(playerIDs);
         Debug.Log("プレイヤーViewID一覧: " + string.Join(", ", viewIDs));
 
-        // プレイヤーオブジェクトをランダムにAチームとBチームに分ける
-        List<int> aTeamViewIDs = new List<int>();
-        List<int> bTeamViewIDs = new List<int>();
-
         // 外野設定済みフラグ
         bool aTeamOutfielderSet = false;
         bool bTeamOutfielderSet = false;
 
-        // プレイヤーの数だけループ
+        // プレイヤーの数だけループして、チーム割り振り
         for (int i = 0; i < playerObjs.Length; i++)
         {
             GameObject playerObj = playerObjs[i];
@@ -277,6 +282,16 @@ public class DodgeBallScene : MonoBehaviourPunCallbacks
 
             bool isAteam = (i % 2 == 0);
             bool isInfielder = true; // デフォルトはtrueで設定
+
+            // view.ViewIDをチームリストに追加
+            if (isAteam)
+            {
+                aTeamViewIDs.Add(view.ViewID);
+            }
+            else
+            {
+                bTeamViewIDs.Add(view.ViewID);
+            }
 
             // 各チームに少なくとも一人の外野プレイヤーを含める
             if (playerObjs.Length >= 4)
@@ -299,7 +314,7 @@ public class DodgeBallScene : MonoBehaviourPunCallbacks
                 {"IsAteam", isAteam},
                 {"IsInfielder", isInfielder}
             };
-            view.Owner.SetCustomProperties(props);           
+            view.Owner.SetCustomProperties(props);          
         }
 
         // ルーム内のチームのViewIDをカスタムプロパティとして保持
@@ -310,9 +325,6 @@ public class DodgeBallScene : MonoBehaviourPunCallbacks
 
         Debug.Log("AチームのプレイヤーViewID一覧: " + string.Join(", ", aTeamViewIDs));
         Debug.Log("BチームのプレイヤーViewID一覧: " + string.Join(", ", bTeamViewIDs));
-
-        // プレイヤーオブジェクトの色変更（マスタークライアント&それ以外のクライアントで、通信を介してスクリプト実行）
-        photonView.RPC(nameof(ControllColor), RpcTarget.AllViaServer, aTeamViewIDs.ToArray(), bTeamViewIDs.ToArray());
     }
 
     // プレイヤーのカスタムプロパティが変更されたとき
@@ -342,7 +354,6 @@ public class DodgeBallScene : MonoBehaviourPunCallbacks
     {   
         // Aチームのカラー設定
         SetTeamColor(aTeamViewIDs, aTeamMaterial);
-
         // Bチームのカラー設定
         SetTeamColor(bTeamViewIDs, bTeamMaterial);
     }
@@ -359,13 +370,46 @@ public class DodgeBallScene : MonoBehaviourPunCallbacks
             {
                 // SkinnedMeshRendererから現在のマテリアル配列を取得
                 Material[] materials = skinnedMeshRenderer.materials;
-
                 // チームのマテリアル設定
                 materials[0] = teamMaterial;
-
                 // SkinnedMeshRendererのmaterialsプロパティに更新された配列を再設定
                 skinnedMeshRenderer.materials = materials;
             }
+            else
+            {
+                Debug.LogError($"ViewID:{viewID}のプレイヤーのSkinnedMeshRendererが取得できません");
+            }
         }
     }
+
+    // ボールをストレートに投げるボタンをクリックしたとき
+    public void OnClickStraightThrowBall()
+    {
+        StartCoroutine(myPlayerScript.StraightThrowBallCoroutine());
+    }
+
+    // ボールをやまなりにパスするボタンをクリックしたとき
+    public void OnClickLobPass()
+    {
+        StartCoroutine(myPlayerScript.LobPassCoroutine());
+    }
+
+    // ボールを落とすボタンをクリックしたとき
+    public void OnClickDropBall()
+    {
+        StartCoroutine(myPlayerScript.DropBallCoroutine());
+    }
+
+    // ボールをキャッチするボタンをクリックしたとき
+    public void OnClickCatching()
+    {
+        myPlayerScript.StartCatching();
+    }
+
+    // ボールをキャッチするボタンを離したとき
+    public void OnPointerUpCatching()
+    {
+        myPlayerScript.StopCatching();
+    }
+
 }

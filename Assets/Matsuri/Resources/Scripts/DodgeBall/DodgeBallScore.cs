@@ -25,7 +25,7 @@ public class DodgeBallScore : MonoBehaviourPunCallbacks
     // ゲームが開始してるかどうかのフラグ
 	public bool isStartGame = false;
 
-    // オブジェクト生成時
+    // スクリプトが有効になってから、最初のフレームの更新が行われる前に呼び出し
     void Start()
     {
        scoreTmp = GetComponentInChildren<TextMeshProUGUI>();

@@ -17,6 +17,7 @@ public class CameraController : MonoBehaviour
     // バック移動してるか
     public bool isBack = false;
 
+    // スクリプトが有効になってから、最初のフレームの更新が行われる前に呼び出し
     void Start()
     {
         // カメラコンポーネントの取得

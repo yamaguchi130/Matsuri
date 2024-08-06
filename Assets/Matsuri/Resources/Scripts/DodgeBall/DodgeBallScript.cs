@@ -44,7 +44,7 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
     // ボールの回転速度の係数
     [SerializeField] private float _rotationSpeedFactor = 10f;
 
-    // アタッチしたゲームオブジェクトが有効になったとき
+    // スクリプトが有効になってから、最初のフレームの更新が行われる前に呼び出し
     void Start()
     {
         // 物理演算用のコンポーネント取得
@@ -70,23 +70,26 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
         // プレイヤーがボールを持ってたら
         if(hasBall)
         {
-            // 重力、衝突無効を設定
+            // 物理的な力（例えば、AddForce）や衝突によって移動しない
+            // これを入れないと、プレイヤーがボールを持っているときに、プレイヤーがはねてしまう
             rb.isKinematic = true;
 
             // ボールをリスポーンするかのチェック
-            // StartCoroutine(ShouldRespawnBall());
+            StartCoroutine(ShouldRespawnBall());
         }
         else
         {   
-            // 重力、衝突無効を設定しない
+            // 重力、衝突無効を設定しない（デフォルト）
             rb.isKinematic = false;
         }
-
     }
 
     // ボールが投げられたとき
     public void OnBallThrown(int ThrownPlayerViewID, bool isATeam)
     {
+        // 誰もボールを持ってない判定にする
+        hasBall = false;
+
         // 最後に投げたプレイヤーのViewIDを取得
         lastThrownPlayerViewID = ThrownPlayerViewID;
 
@@ -154,6 +157,8 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
         {
             // Hit判定をなくす
             isHitEnabled = false;
+            // 誰も持ってない判定にする
+            hasBall = false;
         }
 
         // 衝突したプレイヤーオブジェクトのView取得
@@ -229,5 +234,36 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
     public void OnOwnershipTransferFailed(PhotonView targetView, Player senderOfFailedRequest)
     {
         Debug.Log("ボールの所有権の転送に失敗しました。");
+    }
+
+    // RPCで他のクライアントに、ボールの親子関係の追加を反映
+    [PunRPC]
+    void SetBallToPlayer(int targetPlayerViewId)
+    {
+        // 対象のプレイヤーのViewを取得
+        PhotonView targetPlayerView = PhotonView.Find(targetPlayerViewId);
+        if (targetPlayerView == null)
+        {
+            Debug.LogError($"ViewID:{targetPlayerViewId} のプレイヤーが見つかりません");
+        }
+
+        // 対象のプレイヤーの右手のボーンを見つける
+        Transform rightHandBone = targetPlayerView.transform.Find("mixamorig6:Hips/mixamorig6:Spine/mixamorig6:Spine1/mixamorig6:Spine2/mixamorig6:RightShoulder/mixamorig6:RightArm/mixamorig6:RightForeArm/mixamorig6:RightHand");
+        if (rightHandBone == null)
+        {
+            Debug.LogError("右手のボーンが見つかりません");
+        }
+
+        // ボール位置を、右の手のひらに設定(親オブジェクトに紐づけるので、ローカル座標にする)
+        transform.SetParent(rightHandBone, false);
+    }
+
+    // RPCで他のクライアントに、ボールの親子関係の解除を反映
+    [PunRPC]
+    void UnsetBallToPlayer()
+    {
+        // ボールとプレイヤーの親子関係をリセット
+        // transform.SetParent(null);じゃダメ
+        transform.parent = null;
     }
 }

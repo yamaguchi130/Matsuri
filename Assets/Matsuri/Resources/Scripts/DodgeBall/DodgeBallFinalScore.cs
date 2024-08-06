@@ -12,7 +12,7 @@ public class DodgeBallFinalScore : MonoBehaviourPunCallbacks
     // スコアパネル
     public GameObject scorePanel;
 
-    // オブジェクト生成時
+    // スクリプトが有効になってから、最初のフレームの更新が行われる前に呼び出し
     void Start()
     { 
         // スコアパネルを非表示

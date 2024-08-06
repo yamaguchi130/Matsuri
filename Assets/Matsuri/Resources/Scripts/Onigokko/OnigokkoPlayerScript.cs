@@ -45,7 +45,7 @@ public class OnigokkoPlayerScript : MonoBehaviourPun
     // オブジェクトを点滅させるスクリプト
     private RendererOnOffExample flashScript;
 
-    // アタッチしたゲームオブジェクトが有効になったとき
+    // スクリプトが有効になってから、最初のフレームの更新が行われる前に呼び出し
     void Start()
     {
         // 物理演算用のコンポーネント取得

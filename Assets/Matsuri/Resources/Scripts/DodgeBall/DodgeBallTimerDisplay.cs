@@ -26,6 +26,7 @@ public class DodgeBallTimerDisplay : MonoBehaviour {
     // タイマーを止めるフラグ
     public bool isStopTimer = false;
 
+    // スクリプトが有効になってから、最初のフレームの更新が行われる前に呼び出し
     void Start () {
         initialLimitSeconds = (int) limitSeconds;
         gameStartedSeconds = initialLimitSeconds - 3;

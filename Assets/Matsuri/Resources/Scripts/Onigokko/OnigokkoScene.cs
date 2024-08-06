@@ -49,7 +49,7 @@ public class OnigokkoScene : MonoBehaviourPunCallbacks
     // プレイヤーオブジェクト
     GameObject playerObject;
 
-    // オブジェクトがアクティブな場合の、初期処理
+    // スクリプトが有効になってから、最初のフレームの更新が行われる前に呼び出し
     void Start()
     {
         // デフォルトの同期頻度（20秒/回）だと、他のプレイヤーがラグいため、調整した
