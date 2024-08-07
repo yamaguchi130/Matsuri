@@ -35,7 +35,7 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
     // Hit判定が有効かどうかのフラグ
     public bool isHitEnabled = false;
 
-    // ボールのリスポーン時間(5秒)
+    // ボールのリスポーン時間(秒)
     float ballRespawnTime = 5f;
 
     // ボールの初期位置
@@ -43,6 +43,9 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
 
     // ボールの回転速度の係数
     [SerializeField] private float _rotationSpeedFactor = 10f;
+
+    // ボールをリスポーンしたかどうかのフラグ（デフォルトfalse）
+    private bool isBallRespawned = false;
 
     // スクリプトが有効になってから、最初のフレームの更新が行われる前に呼び出し
     void Start()
@@ -74,13 +77,49 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
             // これを入れないと、プレイヤーがボールを持っているときに、プレイヤーがはねてしまう
             rb.isKinematic = true;
 
-            // ボールをリスポーンするかのチェック
-            StartCoroutine(ShouldRespawnBall());
+            // 未リスポーンに設定
+            isBallRespawned = false;
         }
+        // プレイヤーがボールを持ってなかったら
         else
         {   
             // 重力、衝突無効を設定しない（デフォルト）
             rb.isKinematic = false;
+
+            // ボールが未リスポーンなら
+            if(!isBallRespawned)
+            {
+                // ボールをリスポーンするかのチェック
+                StartCoroutine(ShouldRespawnBall());
+            }
+        }
+    }
+
+    IEnumerator ShouldRespawnBall()
+    {
+        while (true)
+        {
+            // ボールのHit判定がない場合
+            if (!isHitEnabled)
+            {
+                // 指定秒間待機
+                yield return new WaitForSeconds(ballRespawnTime);
+
+                // 再度ボールの状態を確認して、ボールのHit判定がない場合
+                if (!isHitEnabled)
+                {
+                    // 初期位置に戻す
+                    Debug.Log("ボールを初期位置に戻します。");
+                    transform.position = initialPosition;
+                    // リスポーン済みに設定
+                    isBallRespawned = true;
+                }
+            }
+            else
+            {
+                // 次のフレームまで待機
+                yield return null;
+            }
         }
     }
 
@@ -113,32 +152,6 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
         }
     }
 
-    IEnumerator ShouldRespawnBall()
-    {
-        while (true)
-        {
-            // ボールのHit判定がない場合
-            if (!isHitEnabled)
-            {
-                // 5秒間待機
-                yield return new WaitForSeconds(ballRespawnTime);
-
-                // 再度ボールの状態を確認して、ボールのHit判定がない場合
-                if (!isHitEnabled)
-                {
-                    // 初期位置に戻す
-                    Debug.Log("ボールを初期位置に戻します。");
-                    transform.position = initialPosition;
-                }
-            }
-            else
-            {
-                // 次のフレームまで待機
-                yield return null;
-            }
-        }
-    }
-
     // オブジェクトの衝突時
     void OnCollisionEnter(Collision collision)
     {
@@ -152,9 +165,10 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
             return;
         }
 
-        // 地面に1バウンドしたら
-        if (collision.gameObject.CompareTag("Plane"))
+        // 地面にバウンドしたら
+        if (collision.gameObject.CompareTag("Terrain"))
         {
+            Debug.LogError("OnCollisionEnter: Terrainとボールが衝突しました。");
             // Hit判定をなくす
             isHitEnabled = false;
             // 誰も持ってない判定にする

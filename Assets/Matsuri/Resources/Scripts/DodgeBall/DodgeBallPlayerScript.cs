@@ -49,17 +49,17 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
 
     // Aチームの内野の範囲設定
     private Vector3 aTeamInfielderMinPosition = new Vector3(-4.0f, 0, 0.5f);
-    private Vector3 aTeamInfielderMaxPosition = new Vector3(4.0f, 0, 9.5f);
+    private Vector3 aTeamInfielderMaxPosition = new Vector3(4.0f, 0, 7.5f);
     // Bチームの内野の範囲設定
-    private Vector3 bTeamInfielderMinPosition = new Vector3(-4.0f, 0, -9.5f);
+    private Vector3 bTeamInfielderMinPosition = new Vector3(-4.0f, 0, -7.5f);
     private Vector3 bTeamInfielderMaxPosition = new Vector3(4.0f, 0, -0.5f);
 
     // Bチームの外野の範囲設定
-    private Vector3 bTeamOutfielderMinPosition = new Vector3(-4.0f, 0, 10.5f);
-    private Vector3 bTeamOutfielderMaxPosition = new Vector3(4.0f, 0, 11.5f);
+    private Vector3 bTeamOutfielderMinPosition = new Vector3(-4.0f, 0, 8.5f);
+    private Vector3 bTeamOutfielderMaxPosition = new Vector3(4.0f, 0, 9.5f);
     // Aチームの外野の範囲設定
-    private Vector3 aTeamOutfielderMinPosition = new Vector3(-4.0f, 0, -11.5f);
-    private Vector3 aTeamOutfielderMaxPosition = new Vector3(4.0f, 0, -10.5f);
+    private Vector3 aTeamOutfielderMinPosition = new Vector3(-4.0f, 0, -9.5f);
+    private Vector3 aTeamOutfielderMaxPosition = new Vector3(4.0f, 0, -8.5f);
 
     // 南向き
     private Quaternion southInitialRotation = Quaternion.Euler(0, 180, 0);
@@ -431,7 +431,7 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
         ballObj = collision.collider.gameObject;
         // ボールの物理演算コンポーネントを取得しておく
         ballRb = ballObj.GetComponent<Rigidbody>();
-        // コライダーを有効にする
+        // ボールのコライダーを取得
         ballCollider = ballObj.GetComponent<Collider>();
     }
 
@@ -469,7 +469,7 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
         // anim.SetTrigger("straightThrow");
 
         // 射出する力の大きさ 
-        float shootForce = 11.0f;
+        float shootForce = 8.0f;
 
         // 向きと大きさからボールに加わる力を計算する
         Vector3 force = transform.forward.normalized * shootForce;
@@ -491,7 +491,7 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
         // anim.SetTrigger("lobPass");
 
         // 射出する力の大きさ 
-        float shootForce = 9.0f;
+        float shootForce = 8.0f;
 
         // 力を加える向きをVector3型で定義
         // プレイヤーの前方斜め上方向に力を加える
@@ -520,7 +520,7 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
         // 全てのクライアントに、プレイヤーとボール親子関係の解除を通知
         ballView.RPC("UnsetBallToPlayer", RpcTarget.AllViaServer);
 
-        // ボールを、誰も持ってない判定にする
+        // ボールを、誰も持ってない判定にする（ボールの重力/衝突/物理を有効にする。これをしないと、AddForceしても飛ばない）
         ballScript.hasBall = false;
 
         // ボールを持ってないパネルを表示
@@ -528,8 +528,8 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
 
         Debug.Log("ボールを持ってないパネルを表示しました");
 
-        // 少し待機してから続行（必要に応じて待機時間を調整）
-        yield return new WaitForSeconds(0.1f);
+        // コルーチンを終了
+        yield break;
     }
 
     // キャッチボタン押下中
