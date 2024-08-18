@@ -4166,7 +4166,7 @@ GameObject:
   - component: {fileID: 1616024253}
   - component: {fileID: 1616024252}
   - component: {fileID: 1616024251}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: RiverTerrain
   m_TagString: Terrain
   m_Icon: {fileID: 0}

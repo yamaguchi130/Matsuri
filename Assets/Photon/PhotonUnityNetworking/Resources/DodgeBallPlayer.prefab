@@ -1394,7 +1394,7 @@ GameObject:
   - component: {fileID: 1372203739351476500}
   m_Layer: 8
   m_Name: DodgeBallPlayer
-  m_TagString: Player
+  m_TagString: DodgeBallPlayer
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0

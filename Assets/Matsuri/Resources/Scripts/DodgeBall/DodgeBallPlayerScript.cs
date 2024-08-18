@@ -522,6 +522,7 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
 
         // ボールを、誰も持ってない判定にする（ボールの重力/衝突/物理を有効にする。これをしないと、AddForceしても飛ばない）
         ballScript.hasBall = false;
+        Debug.Log("ボールは未所持の状態");
 
         // ボールを持ってないパネルを表示
         photonView.RPC("UpdatePanelVisibility", photonView.Owner, false);
@@ -612,7 +613,7 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
 
     private GameObject GetPlayerObject(Photon.Realtime.Player player)
     {
-        foreach (var go in GameObject.FindGameObjectsWithTag("Player"))
+        foreach (var go in GameObject.FindGameObjectsWithTag("DodgeBallPlayer"))
         {
             if (go.GetComponent<PhotonView>().Owner == player)
             {

@@ -36,10 +36,10 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
     public bool isHitEnabled = false;
 
     // ボールのリスポーン時間(秒)
-    float ballRespawnTime = 5f;
+    float ballRespawnTime = 10f;
 
     // ボールの初期位置
-    Vector3 initialPosition = new Vector3(0, 5, 0);
+    Vector3 initialPosition = new Vector3(0, 2, 0);
 
     // ボールの回転速度の係数
     [SerializeField] private float _rotationSpeedFactor = 10f;
@@ -86,8 +86,8 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
             // 重力、衝突無効を設定しない（デフォルト）
             rb.isKinematic = false;
 
-            // ボールが未リスポーンなら
-            if(!isBallRespawned)
+            // ボールのＸ軸,Ｚ軸が初期位置でない、かつ未リスポーンなら
+            if ((transform.position.x != initialPosition.x || transform.position.y != initialPosition.y) && !isBallRespawned)
             {
                 // ボールをリスポーンするかのチェック
                 StartCoroutine(ShouldRespawnBall());
@@ -97,28 +97,28 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
 
     IEnumerator ShouldRespawnBall()
     {
-        while (true)
+        // ボールのHit判定がない場合
+        if (!isHitEnabled)
         {
-            // ボールのHit判定がない場合
+            // 指定秒間待機
+            yield return new WaitForSeconds(ballRespawnTime);
+
+            // 再度ボールの状態を確認して、ボールのHit判定がない場合
             if (!isHitEnabled)
             {
-                // 指定秒間待機
-                yield return new WaitForSeconds(ballRespawnTime);
+                // 速度をリセット
+                rb.velocity = Vector3.zero;
+                // 回転もリセットする
+                rb.angularVelocity = Vector3.zero;
+                // 慣性テンソルの回転をリセット
+                rb.inertiaTensorRotation = Quaternion.identity;
 
-                // 再度ボールの状態を確認して、ボールのHit判定がない場合
-                if (!isHitEnabled)
-                {
-                    // 初期位置に戻す
-                    Debug.Log("ボールを初期位置に戻します。");
-                    transform.position = initialPosition;
-                    // リスポーン済みに設定
-                    isBallRespawned = true;
-                }
-            }
-            else
-            {
-                // 次のフレームまで待機
-                yield return null;
+                // 初期位置に戻す
+                Debug.LogError("ボールを初期位置に戻します。");
+                transform.position = initialPosition;
+
+                // リスポーン済みに設定
+                isBallRespawned = true;
             }
         }
     }
@@ -155,16 +155,6 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
     // オブジェクトの衝突時
     void OnCollisionEnter(Collision collision)
     {
-        // 敵チームのプレイヤーオブジェクトのViewIDループする
-        int[] ids = (int[])enemyTeamViewIDs;
-
-        // 敵チームのプレイヤーオブジェクトがない場合
-        if (ids == null || ids.Length == 0)
-        {
-            // 何もしない
-            return;
-        }
-
         // 地面にバウンドしたら
         if (collision.gameObject.CompareTag("Terrain"))
         {
@@ -175,15 +165,29 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
             hasBall = false;
         }
 
-        // 衝突したプレイヤーオブジェクトのView取得
-        PhotonView collisionView = collision.collider.GetComponent<PhotonView>();
+        // 敵チームのプレイヤーオブジェクトのViewIDループする
+        int[] ids = (int[])enemyTeamViewIDs;
 
-        foreach (int viewId in ids)
+        // 敵チームのプレイヤーオブジェクトがない場合
+        if (ids == null || ids.Length == 0)
         {
-            // プレイヤーが投げたボールが、相手チームのプレイヤーに衝突した場合
-            if (viewId == collisionView.ViewID && isHitEnabled)
+            // 何もしない
+            return;
+        }
+
+        // プレイヤーに衝突したら
+        if (collision.gameObject.CompareTag("DodgeBallPlayer"))
+        {
+            // 衝突したプレイヤーオブジェクトのView取得
+            PhotonView collisionView = collision.collider.GetComponent<PhotonView>();
+
+            foreach (int viewId in ids)
             {
-                OnBallHit();
+                // プレイヤーが投げたボールが、相手チームのプレイヤーに衝突した場合
+                if (viewId == collisionView.ViewID && isHitEnabled)
+                {
+                    OnBallHit();
+                }
             }
         }    
     }
@@ -247,7 +251,7 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
     // 所有権の転送が失敗したときに呼び出される
     public void OnOwnershipTransferFailed(PhotonView targetView, Player senderOfFailedRequest)
     {
-        Debug.Log("ボールの所有権の転送に失敗しました。");
+        Debug.LogError("ボールの所有権の転送に失敗しました。");
     }
 
     // RPCで他のクライアントに、ボールの親子関係の追加を反映

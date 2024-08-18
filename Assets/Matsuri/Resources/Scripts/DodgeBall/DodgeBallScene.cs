@@ -261,7 +261,7 @@ public class DodgeBallScene : MonoBehaviourPunCallbacks
     private void SelectTeam()
     {
         // 全プレイヤーオブジェクトを取得
-        playerObjs = GameObject.FindGameObjectsWithTag("Player");
+        playerObjs = GameObject.FindGameObjectsWithTag("DodgeBallPlayer");
 
         // 全プレイヤーオブジェクトのViewIDを、カスタムプロパティに格納しておく
         ExitGames.Client.Photon.Hashtable playerIDs = new ExitGames.Client.Photon.Hashtable();
