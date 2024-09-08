@@ -53,6 +53,9 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
     // ボールを持つプレイヤーオブジェクトのPhotonView
     private PhotonView ballHolderView;
 
+    // isKinematic の設定完了フラグ（trueなら完了/falseなら未完了）
+    public bool isKinematicSet = false;
+
 
     // スクリプトが有効になってから、最初のフレームの更新が行われる前に呼び出し
     void Start()
@@ -115,6 +118,17 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
                 isBallRespawned = true;
             }
         }
+    }
+
+    // ボールの物理挙動のリセット
+    private void ResetRigidbody()
+    {
+        // 速度をリセット
+        rb.velocity = Vector3.zero;
+        // 回転もリセットする
+        rb.angularVelocity = Vector3.zero;
+        // 慣性テンソルの回転をリセット
+        rb.ResetInertiaTensor();
     }
 
     // ボールが投げられたとき
@@ -258,7 +272,7 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
             // anim.SetTrigger("straightThrow");
 
             // 射出する力の大きさ 
-            float shootForce = 10.0f;
+            float shootForce = 8.0f;
 
             // 向きと大きさからボールに加わる力を計算する
             Vector3 force = ballHolderTransform.forward.normalized * shootForce;
@@ -273,6 +287,9 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
             {
                 Debug.LogError("リジッドボディ (Rigidbody) が見つかりません");
             }
+
+            // ボールを持っているプレイヤーのtransformを削除
+            ballHolderTransform = null;
         }
         catch (Exception ex)
         {
@@ -295,7 +312,7 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
             // anim.SetTrigger("lobPass");
 
             // 射出する力の大きさ 
-            float shootForce = 10.0f;
+            float shootForce = 8.0f;
 
             // 力を加える向きをVector3型で定義
             Vector3 forceDirection = (ballHolderTransform.forward + ballHolderTransform.up).normalized;
@@ -313,6 +330,9 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
             {
                 Debug.LogError("リジッドボディ (Rigidbody) が見つかりません");
             }
+
+            // ボールを持っているプレイヤーのtransformを削除
+            ballHolderTransform = null;
         }
         catch (Exception ex)
         {
@@ -330,6 +350,9 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
         {
             // ボールをプレイヤーの前方1ユニット、高さ1ユニットに配置
             transform.position = ballHolderTransform.position + ballHolderTransform.forward * 1f + ballHolderTransform.up * 2f;
+
+            // ボールを持っているプレイヤーのtransformを削除
+            ballHolderTransform = null;
         }
         catch (Exception ex)
         {
@@ -340,22 +363,29 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
     // プレイヤーからボールを切り離すコルーチン
     private void DetachBallFromPlayer()
     {
-        // 全てのクライアントに、プレイヤーとボール親子関係の解除を通知
-        photonView.RPC("UnsetBallToPlayer", RpcTarget.AllViaServer);
-        Debug.Log("ボールは未所持の状態");
+        // 物理挙動を有効にする
+        photonView.RPC("ToggleKinematicState", RpcTarget.AllBuffered, false);
 
-        // ボールを持ってないパネルを表示
-        ballHolderView.RPC("UpdatePanelVisibility", ballHolderView.Owner, false);
-        Debug.Log("ボールを持ってないパネルを表示しました");
+        // ボールの物理挙動の設定が完了していたら
+        if(isKinematicSet)
+        {
+            // 全てのクライアントに、プレイヤーとボール親子関係の解除を通知
+            photonView.RPC("UnsetBallToPlayer", RpcTarget.AllViaServer);
+            Debug.Log("ボールは未所持の状態");
+
+            // ボールを持ってないパネルを表示
+            ballHolderView.RPC("UpdatePanelVisibility", ballHolderView.Owner, false);
+            Debug.Log("ボールを持ってないパネルを表示しました");
+            
+            // falseに戻す
+            isKinematicSet = false;
+        }
     }
 
     // RPCで他のクライアントに、ボールの親子関係の追加を反映
     [PunRPC]
     void SetBallToPlayer(int ballHolderViewId)
     {
-        // ボールのバウンドを無効
-        collider.material.bounciness = 0f;
-
         Debug.Log("ボールの親子関係を設定します");
 
         // 対象のプレイヤーのViewを取得
@@ -365,18 +395,14 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
             Debug.LogError($"ViewID:{ballHolderViewId} のプレイヤーが見つかりません");
         }
 
-        // 対象のプレイヤーのtransformを取得
+        // ボールを持っているプレイヤーのtransformを取得
         ballHolderTransform = ballHolderView.transform;
-
         // 対象のプレイヤーの右手のボーンを見つける
         Transform rightHandBone = ballHolderView.transform.Find("mixamorig6:Hips/mixamorig6:Spine/mixamorig6:Spine1/mixamorig6:Spine2/mixamorig6:RightShoulder/mixamorig6:RightArm/mixamorig6:RightForeArm/mixamorig6:RightHand");
         if (rightHandBone == null)
         {
             Debug.LogError("右手のボーンが見つかりません");
         }
-
-        // ボールの物理挙動をリセット
-        ResetRigidbody();
 
         // ボール位置を、右の手のひらに設定(親オブジェクトに紐づけるので、ローカル座標にする)
         transform.SetParent(rightHandBone, false);
@@ -387,9 +413,6 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
     void UnsetBallToPlayer()
     {
         Debug.Log("ボールの親子関係を解除します");
-
-        // ボールのバウンドを有効（デフォルト:1）
-        collider.material.bounciness = 1f;
 
         // ボールとプレイヤーの親子関係を解除
         if (transform.parent != null)
@@ -406,14 +429,32 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
         Debug.Log("ボールはリスポーンしていません");
     }
 
-    // ボールの物理挙動のリセット
-    private void ResetRigidbody()
+    // Rigidbodyの物理挙動を有効化または無効化する(falseなら物理挙動有効/trueなら物理挙動無効)
+    [PunRPC]
+    public void ToggleKinematicState(bool enable)
     {
-        // 速度をリセット
-        rb.velocity = Vector3.zero;
-        // 回転もリセットする
-        rb.angularVelocity = Vector3.zero;
-        // 慣性テンソルの回転をリセット
-        rb.ResetInertiaTensor();
+        // 課題
+        // １、まれにボールを持ったプレイヤーが垂直上昇する
+        // ２、2回目めにボールを持った場合の、ボール位置がおかしい
+        
+        // 物理挙動の設定
+        rb.isKinematic = enable;
+        Debug.Log($"RigidbodyのisKinematicを {enable} に設定しました");
+
+        // true/物理挙動無効にするなら
+        if(enable)
+        {
+            // ボールのバウンドを無効
+            collider.material.bounciness = 0f;
+        }
+        // false/物理挙動有効にするなら
+        else
+        {
+            // ボールのバウンドを有効（デフォルト:1）
+            collider.material.bounciness = 1f;
+        }
+
+        // 物理処理が完了したことをフラグで通知
+        isKinematicSet = true;
     }
 }

@@ -72,16 +72,10 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
     // オブジェクトを点滅させるスクリプト
     private RendererOnOffExample flashScript;
 
-    // ボールのオブジェクト
-    private GameObject ballObj;
     // ボールのスクリプト
     private DodgeBallScript ballScript;
     // ボールのView
     private PhotonView ballView;
-    // ボールの物理演算
-    private Rigidbody ballRb;
-    // ボールのCollider
-    private Collider ballCollider;
 
     // 外野の時間をカウント  
     private float outfieldTime = 0f;
@@ -414,23 +408,27 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
                 yield return null; // 次のフレームまで待機
             }
         }
-        // ボールのオブジェクトを取得しておく
-        ballObj = collision.collider.gameObject;
-        // ボールの物理演算コンポーネントを取得しておく
-        ballRb = ballObj.GetComponent<Rigidbody>();
-        // ボールのコライダーを取得
-        ballCollider = ballObj.GetComponent<Collider>();
 
-        // 全てのクライアントに親子関係の追加を通知
-        ballView.RPC("SetBallToPlayer", RpcTarget.AllViaServer, photonView.ViewID);
+        // 物理挙動を無効にする
+        ballView.RPC("ToggleKinematicState", RpcTarget.AllBuffered, true);
 
-        // ボールのヒット判定を有効にする
-        ballScript.isHitEnabled = true;
-        
-        // ボールを持っているパネルを表示
-        photonView.RPC("UpdatePanelVisibility", photonView.Owner, true);
+        // ボールの物理挙動の設定が完了していたら
+        if(ballScript.isKinematicSet)
+        {
+            // 全てのクライアントに親子関係の追加を通知
+            ballView.RPC("SetBallToPlayer", RpcTarget.AllViaServer, photonView.ViewID);
 
-        Debug.Log($"{PhotonNetwork.LocalPlayer.UserId} が、ボールを所持しました");
+            // ボールのヒット判定を有効にする
+            ballScript.isHitEnabled = true;
+            
+            // ボールを持っているパネルを表示
+            photonView.RPC("UpdatePanelVisibility", photonView.Owner, true);
+
+            Debug.Log($"{PhotonNetwork.LocalPlayer.UserId} が、ボールを所持しました");
+
+            // falseに戻す
+            ballScript.isKinematicSet = false;
+        }
     }
 
     private IEnumerator CooldownRoutine()
