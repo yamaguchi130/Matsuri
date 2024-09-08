@@ -1,3 +1,4 @@
+using System; 
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -13,6 +14,8 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
 {
     // Animatorをanimという変数で定義する
     private Animator anim; 
+    // コライダー
+    private Collider collider;
     // シーン管理用オブジェクト
     private GameObject photonControllerGameObject;
 
@@ -29,23 +32,27 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
     // 最後に投げたプレイヤーのViewID
     public int lastThrownPlayerViewID = -1;
 
-    // プレイヤーがボールを持ってるかどうかのフラグ
-    public bool hasBall = false;
-
     // Hit判定が有効かどうかのフラグ
     public bool isHitEnabled = false;
 
     // ボールのリスポーン時間(秒)
-    float ballRespawnTime = 10f;
+    float ballRespawnTime = 5f;
 
     // ボールの初期位置
-    Vector3 initialPosition = new Vector3(0, 2, 0);
+    Vector3 initialPosition = new Vector3(0, 1, 0);
 
     // ボールの回転速度の係数
     [SerializeField] private float _rotationSpeedFactor = 10f;
 
     // ボールをリスポーンしたかどうかのフラグ（デフォルトfalse）
     private bool isBallRespawned = false;
+
+    // ボールを持つプレイヤーオブジェクトのtransform
+    private Transform ballHolderTransform;
+
+    // ボールを持つプレイヤーオブジェクトのPhotonView
+    private PhotonView ballHolderView;
+
 
     // スクリプトが有効になってから、最初のフレームの更新が行われる前に呼び出し
     void Start()
@@ -57,7 +64,8 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
             Debug.LogError("Rigidbody コンポーネントが見つかりません");
         }
 
-        anim = gameObject.GetComponent<Animator>();
+        // アニメーションのコンポーネントを取得
+        anim = GetComponent<Animator>();
 
         // シーン管理用オブジェクトの設定
         photonControllerGameObject = GameObject.Find("PhotonController");
@@ -65,33 +73,19 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
         {
             Debug.LogError("PhotonControllerが見つかりません");
         }
+
+        // コライダーを取得
+        collider = GetComponent<Collider>();
     }
 
     // 一定感覚（50回/秒）の呼び出し物理演算
     void FixedUpdate()
-    {
-        // プレイヤーがボールを持ってたら
-        if(hasBall)
+    {   
+        // ボールのＸ軸,Ｚ軸が初期位置でない、かつ未リスポーンなら
+        if ((transform.position.x != initialPosition.x || transform.position.y != initialPosition.y) && !isBallRespawned)
         {
-            // 物理的な力（例えば、AddForce）や衝突によって移動しない
-            // これを入れないと、プレイヤーがボールを持っているときに、プレイヤーがはねてしまう
-            rb.isKinematic = true;
-
-            // 未リスポーンに設定
-            isBallRespawned = false;
-        }
-        // プレイヤーがボールを持ってなかったら
-        else
-        {   
-            // 重力、衝突無効を設定しない（デフォルト）
-            rb.isKinematic = false;
-
-            // ボールのＸ軸,Ｚ軸が初期位置でない、かつ未リスポーンなら
-            if ((transform.position.x != initialPosition.x || transform.position.y != initialPosition.y) && !isBallRespawned)
-            {
-                // ボールをリスポーンするかのチェック
-                StartCoroutine(ShouldRespawnBall());
-            }
+            // ボールをリスポーンするかのチェック
+            StartCoroutine(ShouldRespawnBall());
         }
     }
 
@@ -106,15 +100,15 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
             // 再度ボールの状態を確認して、ボールのHit判定がない場合
             if (!isHitEnabled)
             {
-                // 速度をリセット
-                rb.velocity = Vector3.zero;
-                // 回転もリセットする
-                rb.angularVelocity = Vector3.zero;
-                // 慣性テンソルの回転をリセット
-                rb.inertiaTensorRotation = Quaternion.identity;
+                // ボールとプレイヤーの親子関係をリセット
+                // transform.SetParent(null);じゃダメ
+                transform.parent = null;
+
+                // ボールの物理挙動をリセット
+                ResetRigidbody();
 
                 // 初期位置に戻す
-                Debug.LogError("ボールを初期位置に戻します。");
+                Debug.Log("ボールを初期位置に戻します。");
                 transform.position = initialPosition;
 
                 // リスポーン済みに設定
@@ -126,9 +120,6 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
     // ボールが投げられたとき
     public void OnBallThrown(int ThrownPlayerViewID, bool isATeam)
     {
-        // 誰もボールを持ってない判定にする
-        hasBall = false;
-
         // 最後に投げたプレイヤーのViewIDを取得
         lastThrownPlayerViewID = ThrownPlayerViewID;
 
@@ -158,11 +149,9 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
         // 地面にバウンドしたら
         if (collision.gameObject.CompareTag("Terrain"))
         {
-            Debug.LogError("OnCollisionEnter: Terrainとボールが衝突しました。");
+            Debug.Log("OnCollisionEnter: Terrainとボールが衝突しました。");
             // Hit判定をなくす
             isHitEnabled = false;
-            // 誰も持ってない判定にする
-            hasBall = false;
         }
 
         // 敵チームのプレイヤーオブジェクトのViewIDループする
@@ -179,12 +168,12 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
         if (collision.gameObject.CompareTag("DodgeBallPlayer"))
         {
             // 衝突したプレイヤーオブジェクトのView取得
-            PhotonView collisionView = collision.collider.GetComponent<PhotonView>();
+            PhotonView playerView = collision.collider.GetComponent<PhotonView>();
 
             foreach (int viewId in ids)
             {
                 // プレイヤーが投げたボールが、相手チームのプレイヤーに衝突した場合
-                if (viewId == collisionView.ViewID && isHitEnabled)
+                if (viewId == playerView.ViewID && isHitEnabled)
                 {
                     OnBallHit();
                 }
@@ -254,23 +243,140 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
         Debug.LogError("ボールの所有権の転送に失敗しました。");
     }
 
+    // ボールをストレートに投げるコルーチン
+    public void StraightThrowBall()
+    {
+        // プレイヤーからボールを切り離す
+        DetachBallFromPlayer();
+
+        try
+        {
+            // ボールをプレイヤーの前方1ユニット、高さ1ユニットに配置
+            transform.position = ballHolderTransform.position + ballHolderTransform.forward * 1f + ballHolderTransform.up * 2f;
+
+            // Animator発動
+            // anim.SetTrigger("straightThrow");
+
+            // 射出する力の大きさ 
+            float shootForce = 10.0f;
+
+            // 向きと大きさからボールに加わる力を計算する
+            Vector3 force = ballHolderTransform.forward.normalized * shootForce;
+
+            // 物理挙動の設定が有効な場合
+            if (rb != null)
+            {
+                // 力を加えるメソッド(ForceMode.Impulseで短時間に大きな力を加える)
+                rb.AddForce(force, ForceMode.Impulse);
+            }
+            else
+            {
+                Debug.LogError("リジッドボディ (Rigidbody) が見つかりません");
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"StraightThrowBallで例外が発生しました: {ex.Message}");
+        }
+    }
+
+    // ボールをやまなりにパスするコルーチン
+    public void LobPass()
+    {
+        // プレイヤーからボールを切り離す
+        DetachBallFromPlayer();
+
+        try
+        {
+            // ボールをプレイヤーの前方1ユニット、高さ1ユニットに配置
+            transform.position = ballHolderTransform.position + ballHolderTransform.forward * 1f + ballHolderTransform.up * 2f;
+
+            // Animator発動
+            // anim.SetTrigger("lobPass");
+
+            // 射出する力の大きさ 
+            float shootForce = 10.0f;
+
+            // 力を加える向きをVector3型で定義
+            Vector3 forceDirection = (ballHolderTransform.forward + ballHolderTransform.up).normalized;
+
+            // 向きと大きさからボールに加わる力を計算する
+            Vector3 force = forceDirection * shootForce;
+
+            // 物理挙動の設定が有効な場合
+            if (rb != null)
+            {
+                // 力を加えるメソッド(ForceMode.Impulseで短時間に大きな力を加える)
+                rb.AddForce(force, ForceMode.Impulse);
+            }
+            else
+            {
+                Debug.LogError("リジッドボディ (Rigidbody) が見つかりません");
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"LobPassで例外が発生しました: {ex.Message}");
+        }
+    }
+
+    // ボールを落とすコルーチン
+    public void DropBall()
+    {
+        // プレイヤーからボールを切り離す
+        DetachBallFromPlayer();
+
+        try
+        {
+            // ボールをプレイヤーの前方1ユニット、高さ1ユニットに配置
+            transform.position = ballHolderTransform.position + ballHolderTransform.forward * 1f + ballHolderTransform.up * 2f;
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"DropBallで例外が発生しました: {ex.Message}");
+        }
+    }
+
+    // プレイヤーからボールを切り離すコルーチン
+    private void DetachBallFromPlayer()
+    {
+        // 全てのクライアントに、プレイヤーとボール親子関係の解除を通知
+        photonView.RPC("UnsetBallToPlayer", RpcTarget.AllViaServer);
+        Debug.Log("ボールは未所持の状態");
+
+        // ボールを持ってないパネルを表示
+        ballHolderView.RPC("UpdatePanelVisibility", ballHolderView.Owner, false);
+        Debug.Log("ボールを持ってないパネルを表示しました");
+    }
+
     // RPCで他のクライアントに、ボールの親子関係の追加を反映
     [PunRPC]
-    void SetBallToPlayer(int targetPlayerViewId)
+    void SetBallToPlayer(int ballHolderViewId)
     {
+        // ボールのバウンドを無効
+        collider.material.bounciness = 0f;
+
+        Debug.Log("ボールの親子関係を設定します");
+
         // 対象のプレイヤーのViewを取得
-        PhotonView targetPlayerView = PhotonView.Find(targetPlayerViewId);
-        if (targetPlayerView == null)
+        ballHolderView = PhotonView.Find(ballHolderViewId);
+        if (ballHolderView == null)
         {
-            Debug.LogError($"ViewID:{targetPlayerViewId} のプレイヤーが見つかりません");
+            Debug.LogError($"ViewID:{ballHolderViewId} のプレイヤーが見つかりません");
         }
 
+        // 対象のプレイヤーのtransformを取得
+        ballHolderTransform = ballHolderView.transform;
+
         // 対象のプレイヤーの右手のボーンを見つける
-        Transform rightHandBone = targetPlayerView.transform.Find("mixamorig6:Hips/mixamorig6:Spine/mixamorig6:Spine1/mixamorig6:Spine2/mixamorig6:RightShoulder/mixamorig6:RightArm/mixamorig6:RightForeArm/mixamorig6:RightHand");
+        Transform rightHandBone = ballHolderView.transform.Find("mixamorig6:Hips/mixamorig6:Spine/mixamorig6:Spine1/mixamorig6:Spine2/mixamorig6:RightShoulder/mixamorig6:RightArm/mixamorig6:RightForeArm/mixamorig6:RightHand");
         if (rightHandBone == null)
         {
             Debug.LogError("右手のボーンが見つかりません");
         }
+
+        // ボールの物理挙動をリセット
+        ResetRigidbody();
 
         // ボール位置を、右の手のひらに設定(親オブジェクトに紐づけるので、ローカル座標にする)
         transform.SetParent(rightHandBone, false);
@@ -280,8 +386,34 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
     [PunRPC]
     void UnsetBallToPlayer()
     {
-        // ボールとプレイヤーの親子関係をリセット
-        // transform.SetParent(null);じゃダメ
-        transform.parent = null;
+        Debug.Log("ボールの親子関係を解除します");
+
+        // ボールのバウンドを有効（デフォルト:1）
+        collider.material.bounciness = 1f;
+
+        // ボールとプレイヤーの親子関係を解除
+        if (transform.parent != null)
+        {
+            transform.parent = null;  // 親オブジェクトとのリンクを解除
+        }
+        else
+        {
+            Debug.LogWarning("ボールの親子関係はすでに解除されています");
+        }
+
+        // 未リスポーンに設定
+        isBallRespawned = false;
+        Debug.Log("ボールはリスポーンしていません");
+    }
+
+    // ボールの物理挙動のリセット
+    private void ResetRigidbody()
+    {
+        // 速度をリセット
+        rb.velocity = Vector3.zero;
+        // 回転もリセットする
+        rb.angularVelocity = Vector3.zero;
+        // 慣性テンソルの回転をリセット
+        rb.ResetInertiaTensor();
     }
 }

@@ -414,25 +414,23 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
                 yield return null; // 次のフレームまで待機
             }
         }
-
-        Debug.Log($"{PhotonNetwork.LocalPlayer.UserId} が、ボールを所持しました");
-
-        // 全てのクライアントに親子関係の追加を通知
-        ballView.RPC("SetBallToPlayer", RpcTarget.AllViaServer, photonView.ViewID);
-
-        // ボールのヒット判定を有効にする
-        ballScript.isHitEnabled = true;
-        // ボールを持ってる判定にする
-        ballScript.hasBall = true;
-        // ボールを持っているパネルを表示
-        photonView.RPC("UpdatePanelVisibility", photonView.Owner, true);
-
         // ボールのオブジェクトを取得しておく
         ballObj = collision.collider.gameObject;
         // ボールの物理演算コンポーネントを取得しておく
         ballRb = ballObj.GetComponent<Rigidbody>();
         // ボールのコライダーを取得
         ballCollider = ballObj.GetComponent<Collider>();
+
+        // 全てのクライアントに親子関係の追加を通知
+        ballView.RPC("SetBallToPlayer", RpcTarget.AllViaServer, photonView.ViewID);
+
+        // ボールのヒット判定を有効にする
+        ballScript.isHitEnabled = true;
+        
+        // ボールを持っているパネルを表示
+        photonView.RPC("UpdatePanelVisibility", photonView.Owner, true);
+
+        Debug.Log($"{PhotonNetwork.LocalPlayer.UserId} が、ボールを所持しました");
     }
 
     private IEnumerator CooldownRoutine()
@@ -454,83 +452,6 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
         {
             flashScript.isFlash = false;
         }
-    }
-
-    // ボールをストレートに投げるコルーチン
-    public IEnumerator StraightThrowBallCoroutine()
-    {
-        // プレイヤーからボールを切り離す
-        yield return StartCoroutine(DetachBallFromPlayerCoroutine());
-
-        // ボールをプレイヤーの前方1ユニット、高さ1ユニットに配置
-        ballObj.transform.position = transform.position + transform.forward * 1f + transform.up * 2f;
-
-        // Animator発動（発動しないし、地面にめり込む）
-        // anim.SetTrigger("straightThrow");
-
-        // 射出する力の大きさ 
-        float shootForce = 8.0f;
-
-        // 向きと大きさからボールに加わる力を計算する
-        Vector3 force = transform.forward.normalized * shootForce;
-
-        // 力を加えるメソッド(ForceMode.Impulseで短時間に大きな力を加える)
-        ballRb.AddForce(force, ForceMode.Impulse);
-    }
-
-    // ボールをやまなりにパスするコルーチン
-    public IEnumerator LobPassCoroutine()
-    {
-        // プレイヤーからボールを切り離す
-        yield return StartCoroutine(DetachBallFromPlayerCoroutine());
-
-        // ボールをプレイヤーの前方1ユニット、高さ1ユニットに配置
-        ballObj.transform.position = transform.position + transform.forward * 1f + transform.up * 2f;
-
-        // Animator発動（発動しないし、地面にめり込む）
-        // anim.SetTrigger("lobPass");
-
-        // 射出する力の大きさ 
-        float shootForce = 8.0f;
-
-        // 力を加える向きをVector3型で定義
-        // プレイヤーの前方斜め上方向に力を加える
-        Vector3 forceDirection = (transform.forward + transform.up).normalized;
-
-        // 向きと大きさからボールに加わる力を計算する
-        Vector3 force = forceDirection * shootForce;
-
-        // 力を加えるメソッド(ForceMode.Impulseで短時間に大きな力を加える)
-        ballRb.AddForce(force, ForceMode.Impulse);
-    }
-
-    // ボールを落とすコルーチン
-    public IEnumerator DropBallCoroutine()
-    {
-        // プレイヤーからボールを切り離す
-        yield return StartCoroutine(DetachBallFromPlayerCoroutine());
-
-        // ボールをプレイヤーの前方1ユニット、高さ1ユニットに配置
-        ballObj.transform.position = transform.position + transform.forward * 1f + transform.up * 2f;
-    }
-
-    // プレイヤーからボールを切り離すコルーチン
-    private IEnumerator DetachBallFromPlayerCoroutine()
-    {
-        // 全てのクライアントに、プレイヤーとボール親子関係の解除を通知
-        ballView.RPC("UnsetBallToPlayer", RpcTarget.AllViaServer);
-
-        // ボールを、誰も持ってない判定にする（ボールの重力/衝突/物理を有効にする。これをしないと、AddForceしても飛ばない）
-        ballScript.hasBall = false;
-        Debug.Log("ボールは未所持の状態");
-
-        // ボールを持ってないパネルを表示
-        photonView.RPC("UpdatePanelVisibility", photonView.Owner, false);
-
-        Debug.Log("ボールを持ってないパネルを表示しました");
-
-        // コルーチンを終了
-        yield break;
     }
 
     // キャッチボタン押下中

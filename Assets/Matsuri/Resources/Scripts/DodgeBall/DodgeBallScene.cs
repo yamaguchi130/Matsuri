@@ -57,10 +57,14 @@ public class DodgeBallScene : MonoBehaviourPunCallbacks
     DodgeBallPlayerScript myPlayerScript;
     // ボールオブジェクト
     GameObject ballObject;
+    // ボールのスクリプト
+    DodgeBallScript ballScript;
+
 
     // プレイヤーオブジェクトをランダムにAチームとBチームに分ける為のリスト
     List<int> aTeamViewIDs = new List<int>();
     List<int> bTeamViewIDs = new List<int>();
+
 
 
     // スクリプトが有効になってから、最初のフレームの更新が行われる前に呼び出し
@@ -177,6 +181,13 @@ public class DodgeBallScene : MonoBehaviourPunCallbacks
     // ゲームスタート処理を行うコルーチン
     IEnumerator StartGameCoroutine()
     {
+        // マスタークライアントでのみ実行
+        if (PhotonNetwork.IsMasterClient)
+        {
+            // ボールの生成
+            PhotonNetwork.Instantiate(ballPrefab.name, initialPosition, randomRotation);
+        }
+
         // これがBチームのプレイヤーもtrueになってる
         Debug.Log($"Aチーム:{myPlayerScript.isAteam}でスタートします。"); 
         // 自身のプレイヤーオブジェクトの配置設定
@@ -222,11 +233,17 @@ public class DodgeBallScene : MonoBehaviourPunCallbacks
         // 自身のプレイヤーオブジェクトを移動可能に設定
         myPlayerScript.move = true;
 
-        // マスタークライアントでのみ実行
-        if (PhotonNetwork.IsMasterClient)
+        // ボールのスクリプトを取得（マスタークライアント以外でも取得するため、Findを使用）
+        ballObject = GameObject.FindWithTag("Ball");
+        if (ballObject == null)
         {
-            // ボールの生成
-            ballObject = PhotonNetwork.Instantiate(ballPrefab.name, initialPosition, randomRotation);
+            Debug.LogError("ボールのオブジェクトが見つかりません");
+        }
+
+        ballScript = ballObject.GetComponent<DodgeBallScript>();
+        if (ballScript == null)
+        {
+            Debug.LogError("ボールのスクリプトが見つかりません");
         }
     }
 
@@ -385,19 +402,22 @@ public class DodgeBallScene : MonoBehaviourPunCallbacks
     // ボールをストレートに投げるボタンをクリックしたとき
     public void OnClickStraightThrowBall()
     {
-        StartCoroutine(myPlayerScript.StraightThrowBallCoroutine());
+        Debug.Log("ストレートをクリックしました");
+        ballScript.StraightThrowBall();
     }
 
     // ボールをやまなりにパスするボタンをクリックしたとき
     public void OnClickLobPass()
     {
-        StartCoroutine(myPlayerScript.LobPassCoroutine());
+        Debug.Log("山なりパスをクリックしました");
+        ballScript.LobPass();
     }
 
     // ボールを落とすボタンをクリックしたとき
     public void OnClickDropBall()
     {
-        StartCoroutine(myPlayerScript.DropBallCoroutine());
+        Debug.Log("落とすをクリックしました");
+        ballScript.DropBall();
     }
 
     // ボールをキャッチするボタンをクリックしたとき

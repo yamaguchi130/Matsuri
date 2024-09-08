@@ -12,9 +12,18 @@ public class DodgeBallPanelController : MonoBehaviour
     // スクリプトが有効になってから、最初のフレームの更新が行われる前に呼び出し
     void Start()
     {
-        // パネルのCanvasGroupを取得
-        whenHoldingTheBallPanel = GameObject.Find("WhenHoldingTheBallPanel").GetComponent<CanvasGroup>();
-        whenNotHoldingTheBallPanel = GameObject.Find("WhenNotHoldingTheBallPanel").GetComponent<CanvasGroup>();
+        // パネルのCanvasGroupを取得し、取得に失敗した場合はエラーログを出力
+        whenHoldingTheBallPanel = GameObject.Find("WhenHoldingTheBallPanel")?.GetComponent<CanvasGroup>();
+        if (whenHoldingTheBallPanel == null)
+        {
+            Debug.LogError("WhenHoldingTheBallPanel の CanvasGroup が見つかりませんでした。");
+        }
+
+        whenNotHoldingTheBallPanel = GameObject.Find("WhenNotHoldingTheBallPanel")?.GetComponent<CanvasGroup>();
+        if (whenNotHoldingTheBallPanel == null)
+        {
+            Debug.LogError("WhenNotHoldingTheBallPanel の CanvasGroup が見つかりませんでした。");
+        }
     }
 
     // ネットワーク経由でフラグに基づいて、
