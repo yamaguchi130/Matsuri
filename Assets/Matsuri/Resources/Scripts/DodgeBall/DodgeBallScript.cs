@@ -160,7 +160,23 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
     // オブジェクトの衝突時
     void OnCollisionEnter(Collision collision)
     {
-        // 地面にバウンドしたら
+        // プレイヤーがボールを持ってる状態の場合
+        if (ballHolderTransform)
+        {
+            // 何もしない
+            return;
+        }
+
+        // 敵チームのプレイヤーオブジェクトのViewIDループする
+        int[] ids = (int[])enemyTeamViewIDs;
+        // 敵チームのプレイヤーオブジェクトがない場合
+        if (ids == null || ids.Length == 0)
+        {
+            // 何もしない
+            return;
+        }
+
+        // ボールが地面にバウンドしたら
         if (collision.gameObject.CompareTag("Terrain"))
         {
             Debug.Log("OnCollisionEnter: Terrainとボールが衝突しました。");
@@ -168,15 +184,6 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
             isHitEnabled = false;
         }
 
-        // 敵チームのプレイヤーオブジェクトのViewIDループする
-        int[] ids = (int[])enemyTeamViewIDs;
-
-        // 敵チームのプレイヤーオブジェクトがない場合
-        if (ids == null || ids.Length == 0)
-        {
-            // 何もしない
-            return;
-        }
 
         // プレイヤーに衝突したら
         if (collision.gameObject.CompareTag("DodgeBallPlayer"))

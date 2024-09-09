@@ -401,12 +401,8 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
             // ボールの所有権をリクエスト
             ballView.RequestOwnership();
             Debug.Log("ボールの所有権をリクエストしました");
-
-            // 所有権が設定されるまで待機
-            while (!ballView.IsMine)
-            {
-                yield return null; // 次のフレームまで待機
-            }
+            // 所有権が付与されるまで待つ
+            yield return new WaitUntil(() => ballView.IsMine);
         }
 
         // 物理挙動を無効にする
