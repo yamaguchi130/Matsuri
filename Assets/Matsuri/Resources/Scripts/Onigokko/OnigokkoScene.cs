@@ -54,9 +54,9 @@ public class OnigokkoScene : MonoBehaviourPunCallbacks
     {
         // デフォルトの同期頻度（20秒/回）だと、他のプレイヤーがラグいため、調整した
         // SendRate を80に設定
-        PhotonNetwork.SendRate = 80;
+        PhotonNetwork.SendRate = 60;
         // SerializationRate を80に設定
-        PhotonNetwork.SerializationRate = 80;
+        PhotonNetwork.SerializationRate = 60;
 
         // マルチプレイヤー対応
         PhotonNetwork.ConnectUsingSettings();

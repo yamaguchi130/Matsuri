@@ -124,9 +124,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   move: 1
   lastThrownPlayerViewID: -1
-  hasBall: 0
   isHitEnabled: 0
-  _rotationSpeedFactor: 10
+  isKinematicSet: 0
 --- !u!54 &8796802568228833532
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -174,6 +173,7 @@ MonoBehaviour:
   observableSearch: 2
   ObservedComponents:
   - {fileID: -2281769634685429161}
+  - {fileID: 0}
   sceneViewId: 0
   InstantiationId: 0
   isRuntimeInstantiated: 0

@@ -15,7 +15,7 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
     // Animatorをanimという変数で定義する
     private Animator anim; 
     // コライダー
-    private Collider collider;
+    private Collider ballCol;
     // シーン管理用オブジェクト
     private GameObject photonControllerGameObject;
 
@@ -40,9 +40,6 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
 
     // ボールの初期位置
     Vector3 initialPosition = new Vector3(0, 1, 0);
-
-    // ボールの回転速度の係数
-    [SerializeField] private float _rotationSpeedFactor = 10f;
 
     // ボールをリスポーンしたかどうかのフラグ（デフォルトfalse）
     private bool isBallRespawned = false;
@@ -78,93 +75,24 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
         }
 
         // コライダーを取得
-        collider = GetComponent<Collider>();
-    }
-
-    // 一定感覚（50回/秒）の呼び出し物理演算
-    void FixedUpdate()
-    {   
-        // ボールのＸ軸,Ｚ軸が初期位置でない、かつ未リスポーンなら
-        if ((transform.position.x != initialPosition.x || transform.position.y != initialPosition.y) && !isBallRespawned)
-        {
-            // ボールをリスポーンするかのチェック
-            StartCoroutine(ShouldRespawnBall());
-        }
-    }
-
-    IEnumerator ShouldRespawnBall()
-    {
-        // ボールのHit判定がない場合
-        if (!isHitEnabled)
-        {
-            // 指定秒間待機
-            yield return new WaitForSeconds(ballRespawnTime);
-
-            // 再度ボールの状態を確認して、ボールのHit判定がない場合
-            if (!isHitEnabled)
-            {
-                // ボールとプレイヤーの親子関係をリセット
-                // transform.SetParent(null);じゃダメ
-                transform.parent = null;
-
-                // ボールの物理挙動をリセット
-                ResetRigidbody();
-
-                // 初期位置に戻す
-                Debug.Log("ボールを初期位置に戻します。");
-                transform.position = initialPosition;
-
-                // リスポーン済みに設定
-                isBallRespawned = true;
-            }
-        }
-    }
-
-    // ボールの物理挙動のリセット
-    private void ResetRigidbody()
-    {
-        // 速度をリセット
-        rb.velocity = Vector3.zero;
-        // 回転もリセットする
-        rb.angularVelocity = Vector3.zero;
-        // 慣性テンソルの回転をリセット
-        rb.ResetInertiaTensor();
-    }
-
-    // ボールが投げられたとき
-    public void OnBallThrown(int ThrownPlayerViewID, bool isATeam)
-    {
-        // 最後に投げたプレイヤーのViewIDを取得
-        lastThrownPlayerViewID = ThrownPlayerViewID;
-
-        // Aチームなら
-        if (isATeam)
-        {
-            // 敵チーム（B）のViewIDリストを取得
-            if (!PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue("bTeamViewIDs", out enemyTeamViewIDs))
-            {
-                Debug.LogError("敵のBチームのViewIDリストが取得できません");
-            }
-        }
-        // Bチームなら
-        else
-        {
-            // 敵チーム（A）のViewIDリストを取得
-            if (!PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue("aTeamViewIDs", out enemyTeamViewIDs))
-            {
-                Debug.LogError("敵のAチームのViewIDリストが取得できません");
-            }
-        }
+        ballCol = GetComponent<Collider>();
     }
 
     // オブジェクトの衝突時
     void OnCollisionEnter(Collision collision)
     {
-        // プレイヤーがボールを持ってる状態の場合
-        if (ballHolderTransform)
+        // ボールが地面にバウンドしたら
+        if (collision.gameObject.CompareTag("Terrain"))
         {
-            // 何もしない
-            return;
+            // Hit判定をなくす
+            isHitEnabled = false;
+
+            // ボールのＸ軸,Ｚ軸が初期位置でない、かつ未リスポーンなら
+            if ((transform.position.x != initialPosition.x || transform.position.y != initialPosition.y) && !isBallRespawned)
+            {
+                // ボールをリスポーンするかのチェック
+                StartCoroutine(ShouldRespawnBall());
+            }
         }
 
         // 敵チームのプレイヤーオブジェクトのViewIDループする
@@ -175,15 +103,6 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
             // 何もしない
             return;
         }
-
-        // ボールが地面にバウンドしたら
-        if (collision.gameObject.CompareTag("Terrain"))
-        {
-            Debug.Log("OnCollisionEnter: Terrainとボールが衝突しました。");
-            // Hit判定をなくす
-            isHitEnabled = false;
-        }
-
 
         // プレイヤーに衝突したら
         if (collision.gameObject.CompareTag("DodgeBallPlayer"))
@@ -200,6 +119,59 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
                 }
             }
         }    
+    }
+
+    // ボールのリスポーン処理
+    private IEnumerator ShouldRespawnBall()
+    {
+        // ボールのHit判定がない場合
+        if (!isHitEnabled)
+        {
+            // 指定秒間待機
+            yield return new WaitForSeconds(ballRespawnTime);
+
+            // 再度ボールの状態を確認して、ボールのHit判定がない場合
+            if (!isHitEnabled)
+            {
+                // RPCで全クライアントにリスポーン処理を同期
+                photonView.RPC("RespawnBallRPC", RpcTarget.AllBuffered);
+            }
+        }
+    }
+
+    // RPCで全クライアントに同期されるリスポーン処理
+    [PunRPC]
+    private void RespawnBallRPC()
+    {
+        // ボールの物理挙動をリセット
+        ResetRigidbody();
+
+        // 初期位置に戻す
+        Debug.Log("ボールを初期位置に戻します。");
+        transform.position = initialPosition;
+
+        // ボールがリスポーン済みと設定
+        isBallRespawned = true;
+
+        // ボールのHit判定をリセット
+        isHitEnabled = false;
+
+        // ボールの物理挙動を再度有効化
+        rb.isKinematic = false;
+
+        // ボールを持っているプレイヤーのtransformを削除
+        ballHolderTransform = null;
+    }
+
+    // ボールの物理挙動のリセット
+    private void ResetRigidbody()
+    {
+        // 速度をリセット
+        rb.velocity = Vector3.zero;
+        // 回転もリセットする
+        rb.angularVelocity = Vector3.zero;
+        // 慣性テンソルの回転をリセット
+        rb.ResetInertiaTensor();
     }
 
     // ボールがヒットしたとき
@@ -294,9 +266,6 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
             {
                 Debug.LogError("リジッドボディ (Rigidbody) が見つかりません");
             }
-
-            // ボールを持っているプレイヤーのtransformを削除
-            ballHolderTransform = null;
         }
         catch (Exception ex)
         {
@@ -337,9 +306,6 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
             {
                 Debug.LogError("リジッドボディ (Rigidbody) が見つかりません");
             }
-
-            // ボールを持っているプレイヤーのtransformを削除
-            ballHolderTransform = null;
         }
         catch (Exception ex)
         {
@@ -357,9 +323,6 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
         {
             // ボールをプレイヤーの前方1ユニット、高さ1ユニットに配置
             transform.position = ballHolderTransform.position + ballHolderTransform.forward * 1f + ballHolderTransform.up * 2f;
-
-            // ボールを持っているプレイヤーのtransformを削除
-            ballHolderTransform = null;
         }
         catch (Exception ex)
         {
@@ -411,7 +374,7 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
             Debug.LogError("右手のボーンが見つかりません");
         }
 
-        // ボール位置を、右の手のひらに設定(親オブジェクトに紐づけるので、ローカル座標にする)
+        // ボール位置を、右の手のひらに設定(親オブジェクトに追従させるので、ローカル座標にする)
         transform.SetParent(rightHandBone, false);
     }
 
@@ -441,8 +404,8 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
     public void ToggleKinematicState(bool enable)
     {
         // 課題
-        // １、まれにボールを持ったプレイヤーが垂直上昇する
-        // ２、2回目めにボールを持った場合の、ボール位置がおかしい
+        // １、まれにボールを持ったプレイヤーの挙動がおかしい(青のマスターじゃないほうが、回転。オレンジのマスターの方が、後方移動)
+        // ２、まれにボールの位置が、右手から離れてる。（アニメーションの影響？）
         
         // 物理挙動の設定
         rb.isKinematic = enable;
@@ -452,13 +415,13 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
         if(enable)
         {
             // ボールのバウンドを無効
-            collider.material.bounciness = 0f;
+            ballCol.material.bounciness = 0f;
         }
         // false/物理挙動有効にするなら
         else
         {
             // ボールのバウンドを有効（デフォルト:1）
-            collider.material.bounciness = 1f;
+            ballCol.material.bounciness = 1f;
         }
 
         // 物理処理が完了したことをフラグで通知
