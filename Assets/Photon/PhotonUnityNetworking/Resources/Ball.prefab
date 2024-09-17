@@ -15,7 +15,7 @@ GameObject:
   - component: {fileID: 6155559103341901590}
   - component: {fileID: 8796802568228833532}
   - component: {fileID: 2826237032339486027}
-  - component: {fileID: -2281769634685429161}
+  - component: {fileID: -3134284085017002107}
   m_Layer: 9
   m_Name: Ball
   m_TagString: Ball
@@ -125,7 +125,6 @@ MonoBehaviour:
   move: 1
   lastThrownPlayerViewID: -1
   isHitEnabled: 0
-  isKinematicSet: 0
 --- !u!54 &8796802568228833532
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -172,12 +171,12 @@ MonoBehaviour:
   OwnershipTransfer: 1
   observableSearch: 2
   ObservedComponents:
-  - {fileID: -2281769634685429161}
+  - {fileID: -3134284085017002107}
   - {fileID: 0}
   sceneViewId: 0
   InstantiationId: 0
   isRuntimeInstantiated: 0
---- !u!114 &-2281769634685429161
+--- !u!114 &-3134284085017002107
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}

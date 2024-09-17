@@ -403,21 +403,21 @@ public class DodgeBallScene : MonoBehaviourPunCallbacks
     public void OnClickStraightThrowBall()
     {
         Debug.Log("ストレートをクリックしました");
-        ballScript.StraightThrowBall();
+        StartCoroutine(ballScript.StraightThrowBall());
     }
 
     // ボールをやまなりにパスするボタンをクリックしたとき
     public void OnClickLobPass()
     {
         Debug.Log("山なりパスをクリックしました");
-        ballScript.LobPass();
+        StartCoroutine(ballScript.LobPass());
     }
 
     // ボールを落とすボタンをクリックしたとき
     public void OnClickDropBall()
     {
         Debug.Log("落とすをクリックしました");
-        ballScript.DropBall();
+        StartCoroutine(ballScript.DropBall());
     }
 
     // ボールをキャッチするボタンをクリックしたとき
