@@ -339,15 +339,24 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
     // コルーチンで親子関係を解除し、完了後にコールバックを実行
     private IEnumerator DetachBallFromPlayer()
     {
+        // ボールを持っているプレイヤーのTransformを取得しておく
+        ballHolderTransform = ballHolderView.GetComponent<Transform>();
+        if (ballHolderTransform == null)
+        {
+            Debug.LogError($"ViewID:{ballHolderView.ViewID} のボールを持っているプレイヤーのtransformが見つかりません");
+        }
+
         // 全てのクライアントに、プレイヤーとボール親子関係の解除を通知
         photonView.RPC("UnsetBallToPlayer", RpcTarget.AllViaServer);
+
+        // UnsetBallToPlayerの完了のため、待機
+        yield return new WaitForSeconds(1f);
 
         // ボールの物理挙動を有効にする
         yield return StartCoroutine(ToggleKinematicState(false, null));
 
         // ボールを持ってないパネルを表示
         ballHolderView.RPC("UpdatePanelVisibility", ballHolderView.Owner, false);
-        Debug.Log("ボールを持ってないパネルを表示しました");
 
         // ボールを未リスポーンに設定
         isBallRespawned = false;
@@ -403,9 +412,9 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
             Physics.IgnoreCollision(ballCol, ballHolderPlayerCol, enable);
         };
     }
-
     
     // RPCで他のクライアントに、ボールの親子関係の解除を反映
+    // PhotonTransformViewは主に位置（Position）、回転（Rotation）、およびスケール（Scale）を同期するために設計されていますが、親子関係（Parenting）自体の同期は行わないので、このRPCは必須。
     [PunRPC]
     void UnsetBallToPlayer()
     {
@@ -415,6 +424,7 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
         if (transform.parent != null)
         {
             transform.parent = null;  // 親オブジェクトとのリンクを解除
+            Debug.Log("ボールの親子関係を解除しました");
         }
         else
         {
@@ -437,8 +447,6 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
             Debug.LogError($"ViewID:{ballHolderViewId} のプレイヤーが見つかりません");
         }
 
-        // ボールを持っているプレイヤーのTransformを取得
-        ballHolderTransform = ballHolderView.GetComponent<Transform>();
         // 対象のプレイヤーの右手のボーンを見つける
         Transform rightHandBone = ballHolderView.transform.Find("mixamorig6:Hips/mixamorig6:Spine/mixamorig6:Spine1/mixamorig6:Spine2/mixamorig6:RightShoulder/mixamorig6:RightArm/mixamorig6:RightForeArm/mixamorig6:RightHand");
         if (rightHandBone == null)

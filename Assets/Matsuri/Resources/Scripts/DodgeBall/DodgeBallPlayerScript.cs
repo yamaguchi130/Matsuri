@@ -417,6 +417,9 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
         // 全てのクライアントに親子関係の追加を通知
         ballView.RPC("SetBallToPlayer", RpcTarget.AllViaServer, photonView.ViewID);
 
+        // SetBallToPlayerの完了のため、待機
+        yield return new WaitForSeconds(1f);
+
         // ボールのヒット判定を有効にする
         ballScript.isHitEnabled = true;
         
