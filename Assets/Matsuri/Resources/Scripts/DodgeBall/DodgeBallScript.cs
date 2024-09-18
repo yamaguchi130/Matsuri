@@ -53,6 +53,9 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
     // 前回取得した、ボールを保持してるプレイヤーのCollider
     private Collider previousPlayerCol;
 
+    // ボールを射出する力の大きさ
+    private float shootForce = 8.0f;
+
 
     // スクリプトが有効になってから、最初のフレームの更新が行われる前に呼び出し
     void Start()
@@ -257,9 +260,6 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
             // ボールをプレイヤーの前方1ユニット、高さ1ユニットに配置
             rb.position = ballHolderTransform.position + ballHolderTransform.forward * 1f + ballHolderTransform.up * 2f;
 
-            // 射出する力の大きさ
-            float shootForce = 8.0f;
-
             // 向きと大きさからボールに加わる力を計算する
             Vector3 force = ballHolderTransform.forward.normalized * shootForce;
 
@@ -292,12 +292,6 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
 
             // ボールをプレイヤーの前方1ユニット、高さ1ユニットに配置
             rb.position = ballHolderTransform.position + ballHolderTransform.forward * 1f + ballHolderTransform.up * 2f;
-
-            // Animator発動
-            // anim.SetTrigger("lobPass");
-
-            // 射出する力の大きさ
-            float shootForce = 8.0f;
 
             // 力を加える向きをVector3型で定義
             Vector3 forceDirection = (ballHolderTransform.forward + ballHolderTransform.up).normalized;
@@ -365,16 +359,6 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
     // Rigidbodyの物理挙動を有効化または無効化する(falseなら物理挙動有効/trueなら物理挙動無効)
     public IEnumerator ToggleKinematicState(bool enable, Collider ballHolderPlayerCol)
     {        
-        // // 物理挙動の設定
-        // rb.isKinematic = enable;
-      
-        // // 期待する状態になるまで待機
-        // while (rb.isKinematic != enable)
-        // {
-        //     Debug.LogError($"RigidbodyのisKinematicが{enable}に設定されるのを待っています...");
-        //     yield return null;  // 次のフレームまで待機
-        // } 
-
         // ballHolderPlayerColがnullの場合、前回のballHolderPlayerColを使う
         if (ballHolderPlayerCol == null)
         {
@@ -434,7 +418,8 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
         Debug.Log("ボールはリスポーンしていません");
     }
 
-    // RPCで他のクライアントに、ボールの親子関係の追加を反映
+    // RPCで他のクライアントに、ボールの親子関係の追加する
+    // 別プレイヤーが投げたボールをキャッチした場合、ボール位置がおかしくなる問題あり
     [PunRPC]
     void SetBallToPlayer(int ballHolderViewId)
     {

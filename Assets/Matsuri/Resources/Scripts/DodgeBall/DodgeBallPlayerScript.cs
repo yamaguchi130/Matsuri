@@ -450,6 +450,20 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
         }
     }
 
+    // straightThrowのアニメーションイベントで実行されるメソッド
+    public void StartStraightThrowCoroutine()
+    {
+        Debug.Log("ストレートのコルーチンを開始します。");
+        StartCoroutine(ballScript.StraightThrowBall());
+    }
+
+    // lobPassのアニメーションイベントで実行されるメソッド
+    public void StartLobPassCoroutine()
+    {
+        Debug.Log("山なりパスのコルーチンを開始します。");
+        StartCoroutine(ballScript.LobPass());
+    }
+
     // キャッチボタン押下中
     public void StartCatching()
     {

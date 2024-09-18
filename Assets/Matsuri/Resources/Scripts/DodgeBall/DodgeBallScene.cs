@@ -55,6 +55,8 @@ public class DodgeBallScene : MonoBehaviourPunCallbacks
     GameObject myPlayerObject;
     // 自身のプレイヤースクリプト
     DodgeBallPlayerScript myPlayerScript;
+    // 自身のプレイヤーのアニメーションコンポーネント
+    private Animator myPlayerAnim; 
     // ボールオブジェクト
     GameObject ballObject;
     // ボールのスクリプト
@@ -113,6 +115,8 @@ public class DodgeBallScene : MonoBehaviourPunCallbacks
         // 非同期で、初期位置にオブジェクト生成
         Vector3 spawnPosition = GetRandomPosition(initialMinPosition, initialMaxPosition);
         myPlayerObject = PhotonNetwork.Instantiate(playerPrefab.name, spawnPosition, randomRotation);
+        // 自身のプレイヤーオブジェクトのアニメーションのコンポーネントを取得
+        myPlayerAnim = myPlayerObject.GetComponent<Animator>();
         Debug.Log($"{PhotonNetwork.LocalPlayer.UserId}の、プレイヤーオブジェクトを生成しました。");
     }
 
@@ -403,20 +407,23 @@ public class DodgeBallScene : MonoBehaviourPunCallbacks
     public void OnClickStraightThrowBall()
     {
         Debug.Log("ストレートをクリックしました");
-        StartCoroutine(ballScript.StraightThrowBall());
+        // Animator発動（アニメーションイベント経由でボールスクリプトのStraightThrowがよばれる）
+        myPlayerAnim.SetTrigger("straightThrow");
     }
 
     // ボールをやまなりにパスするボタンをクリックしたとき
     public void OnClickLobPass()
     {
         Debug.Log("山なりパスをクリックしました");
-        StartCoroutine(ballScript.LobPass());
+        // Animator発動（アニメーションイベント経由でボールスクリプトのLobPassがよばれる）
+        myPlayerAnim.SetTrigger("lobPass");
     }
 
     // ボールを落とすボタンをクリックしたとき
     public void OnClickDropBall()
     {
         Debug.Log("落とすをクリックしました");
+        // ボールスクリプトのDropBallをそのまま呼ぶ
         StartCoroutine(ballScript.DropBall());
     }
 
