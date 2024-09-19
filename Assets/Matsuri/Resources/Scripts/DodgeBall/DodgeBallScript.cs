@@ -344,7 +344,7 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
         photonView.RPC("UnsetBallToPlayer", RpcTarget.AllViaServer);
 
         // UnsetBallToPlayerの完了のため、待機
-        yield return new WaitForSeconds(1f);
+        yield return new WaitForSeconds(0.5f);
 
         // ボールの物理挙動を有効にする
         yield return StartCoroutine(ToggleKinematicState(false, null));

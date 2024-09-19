@@ -236,6 +236,14 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
             MovePlayer();
         }
 
+        // // ボールを投げるアニメーションになったときだけ、Root Motionをtrueにする
+        // AnimatorStateInfo stateInfo = anim.GetCurrentAnimatorStateInfo(0);
+        // bool isThrowing = stateInfo.IsName("Throw");
+        // if (anim.applyRootMotion != isThrowing)// Root Motionの状態が変わったときだけ適用
+        // {
+        //     anim.applyRootMotion = isThrowing;
+        // }
+
         // 外野の場合
         if (!isInfielder)
         {  
@@ -418,7 +426,7 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
         ballView.RPC("SetBallToPlayer", RpcTarget.AllViaServer, photonView.ViewID);
 
         // SetBallToPlayerの完了のため、待機
-        yield return new WaitForSeconds(1f);
+        yield return new WaitForSeconds(0.5f);
 
         // ボールのヒット判定を有効にする
         ballScript.isHitEnabled = true;
@@ -469,8 +477,8 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
     {
         isCatching = true;
 
-        // Animator発動（地面にめり込む）
-        // anim.SetTrigger("catch");
+        // Animator発動
+        anim.SetTrigger("catch");
     }
 
     // キャッチボタンを離したとき 
