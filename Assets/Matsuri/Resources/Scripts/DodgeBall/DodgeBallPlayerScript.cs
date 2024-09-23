@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -83,6 +84,10 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
     // プレイヤーのCollider
     private Collider playerCol;
 
+    // プレイヤーのviewIDリスト
+    public int[] teammateViewIDs;
+    public int[] enemyViewIDs;
+
 
     // スクリプトが有効になってから、最初のフレームの更新が行われる前に呼び出し
     void Start()
@@ -160,9 +165,9 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
             {
                 // Aチーム内野
                 newPosition = new Vector3(
-                    Random.Range(aTeamInfielderMinPosition.x, aTeamInfielderMaxPosition.x),
+                    UnityEngine.Random.Range(aTeamInfielderMinPosition.x, aTeamInfielderMaxPosition.x),
                     aTeamInfielderMinPosition.y,
-                    Random.Range(aTeamInfielderMinPosition.z, aTeamInfielderMaxPosition.z)
+                    UnityEngine.Random.Range(aTeamInfielderMinPosition.z, aTeamInfielderMaxPosition.z)
                 );
                 newRotation = southInitialRotation;
                 Debug.Log($"{PhotonNetwork.LocalPlayer.UserId} がAチームの内野に設定されました。");
@@ -171,9 +176,9 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
             {
                 // Aチーム外野
                 newPosition = new Vector3(
-                    Random.Range(aTeamOutfielderMinPosition.x, aTeamOutfielderMaxPosition.x),
+                    UnityEngine.Random.Range(aTeamOutfielderMinPosition.x, aTeamOutfielderMaxPosition.x),
                     aTeamOutfielderMinPosition.y,
-                    Random.Range(aTeamOutfielderMinPosition.z, aTeamOutfielderMaxPosition.z)
+                    UnityEngine.Random.Range(aTeamOutfielderMinPosition.z, aTeamOutfielderMaxPosition.z)
                 );
                 newRotation = northInitialRotation;
                 Debug.Log($"{PhotonNetwork.LocalPlayer.UserId} がAチームの外野に設定されました。");
@@ -185,9 +190,9 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
             {
                 // Bチーム内野
                 newPosition = new Vector3(
-                    Random.Range(bTeamInfielderMinPosition.x, bTeamInfielderMaxPosition.x),
+                    UnityEngine.Random.Range(bTeamInfielderMinPosition.x, bTeamInfielderMaxPosition.x),
                     bTeamInfielderMinPosition.y,
-                    Random.Range(bTeamInfielderMinPosition.z, bTeamInfielderMaxPosition.z)
+                    UnityEngine.Random.Range(bTeamInfielderMinPosition.z, bTeamInfielderMaxPosition.z)
                 );
                 newRotation = northInitialRotation;
                 Debug.Log($"{PhotonNetwork.LocalPlayer.UserId} がBチームの内野に設定されました。");
@@ -196,9 +201,9 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
             {
                 // Bチーム外野
                 newPosition = new Vector3(
-                    Random.Range(bTeamOutfielderMinPosition.x, bTeamOutfielderMaxPosition.x),
+                    UnityEngine.Random.Range(bTeamOutfielderMinPosition.x, bTeamOutfielderMaxPosition.x),
                     bTeamOutfielderMinPosition.y,
-                    Random.Range(bTeamOutfielderMinPosition.z, bTeamOutfielderMaxPosition.z)
+                    UnityEngine.Random.Range(bTeamOutfielderMinPosition.z, bTeamOutfielderMaxPosition.z)
                 );
                 newRotation = southInitialRotation;
                 Debug.Log($"{PhotonNetwork.LocalPlayer.UserId} がBチームの外野に設定されました。");
@@ -216,9 +221,9 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
     // ランダムな位置に生成
     private Vector3 GetRandomPosition(Vector3 minPosition, Vector3 maxPosition)
     {
-        float randomX = Random.Range(minPosition.x, maxPosition.x);
-        float randomY = Random.Range(minPosition.y, maxPosition.y);
-        float randomZ = Random.Range(minPosition.z, maxPosition.z);
+        float randomX = UnityEngine.Random.Range(minPosition.x, maxPosition.x);
+        float randomY = UnityEngine.Random.Range(minPosition.y, maxPosition.y);
+        float randomZ = UnityEngine.Random.Range(minPosition.z, maxPosition.z);
         return new Vector3(randomX, randomY, randomZ);
     }
 
@@ -325,6 +330,12 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
     // オブジェクトの衝突時に呼び出される
     void OnCollisionEnter(Collision collision)
     {
+        // このオブジェクトが自分のものでなければ処理を行わない
+        if (!photonView.IsMine)
+        {
+            return;
+        }
+
         // ボールと衝突した場合
         if (collision.gameObject.CompareTag("Ball"))
         {
@@ -355,24 +366,43 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
         // Hit判定なしのボールの場合
         if (!ballScript.isHitEnabled)
         {
-            return true;
-        }
-
-        // 最後にボールを持っていたのが味方チームの場合
-        if (IsTeammateHoldingLast() && !IsSamePlayerHoldingLast())
-        {
-            return true;
-        }
-
-        // 最後にボールを持っていたのが敵チームで、キャッチボタン押下中で、全面での衝突なら
-        if (IsEnemyHoldingLast() && isCatching && angle < 45f)
-        {
+            Debug.Log($"ViewID：{photonView.ViewID}のプレイヤーが、Hit判定のないボールと衝突しました。ボールを子オブジェクトに設定します");
             return true;
         }
 
         // 自身が外野にいるとき
         if (!isInfielder)
         {
+            Debug.Log($"ViewID：{photonView.ViewID}のプレイヤーが、外野でボールと衝突しました。ボールを子オブジェクトに設定します");
+            return true;
+        }
+
+        // ルームプロパティを取得
+        var roomProperties = PhotonNetwork.CurrentRoom.CustomProperties;
+        // 自身がAチームの場合
+        if(isAteam)
+        {
+            teammateViewIDs = (int[])roomProperties["aTeamViewIDs"];
+            enemyViewIDs = (int[])roomProperties["bTeamViewIDs"];
+        }
+        // 自身がBチームの場合
+        else
+        {
+            teammateViewIDs = (int[])roomProperties["bTeamViewIDs"];
+            enemyViewIDs = (int[])roomProperties["aTeamViewIDs"];
+        }
+
+        // 最後にボールを持っていたのが味方チームの場合
+        if (IsTeammateHoldingLast())
+        {
+            Debug.Log($"ViewID：{photonView.ViewID}のプレイヤーが、味方チームからパスされたボールと衝突しました。ボールを子オブジェクトに設定します");
+            return true;
+        }
+
+        // 最後にボールを持っていたのが敵チームで、キャッチボタン押下中で、全面での衝突なら
+        if (IsEnemyHoldingLast() && isCatching && angle < 45f)
+        {
+            Debug.Log($"ViewID：{photonView.ViewID}のプレイヤーが、敵チームから投げられたボールをキャッチしました。ボールを子オブジェクトに設定します");
             return true;
         }
 
@@ -381,20 +411,32 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
 
     // 最後にボールを持っていたのが味方チームかどうかを判定する
     private bool IsTeammateHoldingLast()
-    {
-        return ballScript.isHitEnabled && photonView.ViewID != ballScript.lastThrownPlayerViewID;
-    }
-
-    // 最後にボールを持っていたのが自身であるかどうかを判定する
-    private bool IsSamePlayerHoldingLast()
-    {
-        return photonView.ViewID == ballScript.lastThrownPlayerViewID;
+    {        
+        if (Array.Exists(teammateViewIDs, id => id == ballScript.lastThrownPlayerViewID))
+        {
+            Debug.Log("最後にボールを持っていたのは味方チームです。");
+            return true;
+        }
+        else
+        {
+            Debug.Log("最後にボールを持っていたのは味方チームではありません。");
+            return false;
+        }
     }
 
     // 最後にボールを持っていたのが敵チームかどうかを判定する
     private bool IsEnemyHoldingLast()
-    {
-        return ballScript.isHitEnabled && photonView.ViewID != ballScript.lastThrownPlayerViewID;
+    {       
+        if (Array.Exists(enemyViewIDs, id => id == ballScript.lastThrownPlayerViewID))
+        {
+            Debug.Log("最後にボールを持っていたのは敵チームです。");
+            return true;
+        }
+        else
+        {
+            Debug.Log("最後にボールを持っていたのは敵チームではありません。");
+            return false;
+        }
     }
 
     // ボールを持つ
@@ -427,9 +469,6 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
 
         // SetBallToPlayerの完了のため、待機
         yield return new WaitForSeconds(0.5f);
-
-        // ボールのヒット判定を有効にする
-        ballScript.isHitEnabled = true;
         
         // ボールを持っているパネルを表示
         photonView.RPC("UpdatePanelVisibility", photonView.Owner, true);

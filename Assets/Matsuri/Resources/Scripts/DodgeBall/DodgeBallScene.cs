@@ -68,7 +68,6 @@ public class DodgeBallScene : MonoBehaviourPunCallbacks
     List<int> bTeamViewIDs = new List<int>();
 
 
-
     // スクリプトが有効になってから、最初のフレームの更新が行われる前に呼び出し
     void Start()
     {
@@ -112,12 +111,21 @@ public class DodgeBallScene : MonoBehaviourPunCallbacks
     public override void OnJoinedRoom()
     {
         Debug.Log("ルームに入室しました");
+
         // 非同期で、初期位置にオブジェクト生成
         Vector3 spawnPosition = GetRandomPosition(initialMinPosition, initialMaxPosition);
         myPlayerObject = PhotonNetwork.Instantiate(playerPrefab.name, spawnPosition, randomRotation);
+
         // 自身のプレイヤーオブジェクトのアニメーションのコンポーネントを取得
         myPlayerAnim = myPlayerObject.GetComponent<Animator>();
         Debug.Log($"{PhotonNetwork.LocalPlayer.UserId}の、プレイヤーオブジェクトを生成しました。");
+
+        // マスタークライアントのみで実行
+        if (PhotonNetwork.IsMasterClient)
+        {
+            // ボールの生成
+            PhotonNetwork.Instantiate(ballPrefab.name, initialPosition, randomRotation);
+        }
     }
 
     private Vector3 GetRandomPosition(Vector3 minPosition, Vector3 maxPosition)
@@ -151,12 +159,12 @@ public class DodgeBallScene : MonoBehaviourPunCallbacks
         // マッチメイキングの待機
         yield return new WaitForSeconds(matchMakingTime);
 
-        // 以降、途中参加不可能にする
-        PhotonNetwork.CurrentRoom.IsOpen = false;
-
         // ルーム内のプレイヤー数が最少人数以上、かつ偶数であれば
         if (PhotonNetwork.CurrentRoom.PlayerCount >= minPlayers && PhotonNetwork.CurrentRoom.PlayerCount % 2 == 0) 
         {
+            // 以降、途中参加不可能にする
+            PhotonNetwork.CurrentRoom.IsOpen = false;
+
             // マスタークライアントでのみ実行
             if (PhotonNetwork.IsMasterClient)
             {
@@ -185,13 +193,6 @@ public class DodgeBallScene : MonoBehaviourPunCallbacks
     // ゲームスタート処理を行うコルーチン
     IEnumerator StartGameCoroutine()
     {
-        // マスタークライアントでのみ実行
-        if (PhotonNetwork.IsMasterClient)
-        {
-            // ボールの生成
-            PhotonNetwork.Instantiate(ballPrefab.name, initialPosition, randomRotation);
-        }
-
         // これがBチームのプレイヤーもtrueになってる
         Debug.Log($"Aチーム:{myPlayerScript.isAteam}でスタートします。"); 
         // 自身のプレイヤーオブジェクトの配置設定
@@ -227,8 +228,13 @@ public class DodgeBallScene : MonoBehaviourPunCallbacks
         //　ゲームスタート前のカウントダウン時間の設定
         yield return new WaitForSeconds(gameStartCountdownSeconds);
 
+        if (subCamera == null)
+        {
+            Debug.LogError("subCameraがnullです。正しく割り当てられているか確認してください。");
+        }
         // 待機カメラを非アクティブ（プレイヤーカメラに切り替わる）
         subCamera.SetActive(false);
+
 
         // タイマー/スコア開始
         timerDisplay.isStartGame = true;
