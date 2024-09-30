@@ -6,7 +6,7 @@ using TMPro;
 public class DodgeBallTimerDisplay : MonoBehaviour {
 
     // ゲームの制限時間
-    public float limitSeconds = 60.0f;
+    public float limitSeconds = 120.0f;
     private int initialLimitSeconds;
     // ゲーム開始直後の秒数
     private int gameStartedSeconds;

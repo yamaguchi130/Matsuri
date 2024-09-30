@@ -11,7 +11,7 @@ using System.Linq;
 /// <summary>
 /// プレイヤーオブジェクトを制御するクラス
 /// </summary>
-public class DodgeBallPlayerScript : MonoBehaviourPun
+public class DodgeBallPlayerScript : MonoBehaviourPunCallbacks
 {
     // Animatorをanimという変数で定義する
     private Animator anim; 
@@ -39,7 +39,7 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
     public bool move = false;
     
     // 次にHit判定になるまでのクールダウン
-    public float cooldownTime = 5.0f; 
+    public float cooldownTime = 3.0f; 
     private float nextChangeTime = 0f; 
 
     // チームフラグ（True：Aチーム、False：Bチーム）
@@ -213,9 +213,6 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
         // 位置と向きを設定
         transform.position = newPosition;
         transform.rotation = newRotation;
-
-        // 初期状態は、ボールを持ってないパネルを表示
-        photonView.RPC("UpdatePanelVisibility", photonView.Owner, false);
     }
 
     // ランダムな位置に生成
@@ -241,13 +238,6 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
             MovePlayer();
         }
 
-        // // ボールを投げるアニメーションになったときだけ、Root Motionをtrueにする
-        // AnimatorStateInfo stateInfo = anim.GetCurrentAnimatorStateInfo(0);
-        // bool isThrowing = stateInfo.IsName("Throw");
-        // if (anim.applyRootMotion != isThrowing)// Root Motionの状態が変わったときだけ適用
-        // {
-        //     anim.applyRootMotion = isThrowing;
-        // }
 
         // 外野の場合
         if (!isInfielder)
@@ -350,6 +340,8 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
             }
             else
             {
+                // Animatorの'knockedOut'発動
+                anim.SetTrigger("knockedOut");
                 // 自身が外野に移動する
                 isInfielder = false;
                 SetPosition();
@@ -360,6 +352,8 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
     // ボールを持つべきかどうかを判定する
     private bool ShouldHoldBall(Collision collision, float angle)
     {
+        // 外野から投げられたボールが、Hit判定なしになってる？
+
         // ボールのスクリプトを取得
         ballScript = collision.collider.GetComponent<DodgeBallScript>();
 
@@ -445,9 +439,25 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
         // 衝突したボールオブジェクトのView取得
         ballView = collision.collider.GetComponent<PhotonView>();
 
-        // ボールのVIEWが取得できてない場合
+        // ボールのVIEWが取得できない場合
         if (ballView == null)
         {
+            yield break;
+        }
+
+        // ルームプロパティを取得
+        var roomProperties = PhotonNetwork.CurrentRoom.CustomProperties;
+        // ボール保持者がいない場合
+        if ((int)roomProperties["currentBallHolderViewID"] == -1)
+        {
+            // 新しいボール保持者のViewIDをルームプロパティに設定
+            roomProperties["currentBallHolderViewID"] = photonView.ViewID;
+            PhotonNetwork.CurrentRoom.SetCustomProperties(roomProperties);
+        }
+        // ボール保持者がいる場合
+        else
+        {
+            Debug.LogWarning("ボールの保持者がいるため、ボールを所持できません");
             yield break;
         }
 
@@ -478,7 +488,7 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
 
     private IEnumerator CooldownRoutine()
     {
-        // 次に鬼になるまでのクールダウン時間を設定
+        // 内野に復活したあとのクールダウン時間を設定
         nextChangeTime = Time.time + cooldownTime;
 
         // クールダウン期間中、オブジェクトを点滅させる
@@ -501,6 +511,7 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
     public void StartStraightThrowCoroutine()
     {
         Debug.Log("ストレートのコルーチンを開始します。");
+        // Todo たまにNULLになる
         StartCoroutine(ballScript.StraightThrowBall());
     }
 
@@ -527,12 +538,13 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
     }
 
 
-    // このプレイヤーを内野に復活させる
+    // プレイヤーを内野に復活させる
     public void ReviveInField()
     {
         // 外野にいる場合
         if (!isInfielder)
         {
+            Debug.Log($"ViewID：{photonView.ViewID}のプレイヤーが、外野から内野に復活します。");
             // 内野フラグオン
             isInfielder = true;
             // 内野に設定
@@ -543,6 +555,7 @@ public class DodgeBallPlayerScript : MonoBehaviourPun
         }
         else
         {
+            Debug.Log($"ViewID：{photonView.ViewID}のプレイヤー以外を、外野から内野に復活します。");
             // 自チームの外野が、1人以下の場合スキップ
             // if(){
             //     return;

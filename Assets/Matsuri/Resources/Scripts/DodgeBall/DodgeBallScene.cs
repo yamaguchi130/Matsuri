@@ -71,7 +71,7 @@ public class DodgeBallScene : MonoBehaviourPunCallbacks
     // スクリプトが有効になってから、最初のフレームの更新が行われる前に呼び出し
     void Start()
     {
-        // デフォルトの同期頻度（20秒/回）だと、他のプレイヤーがラグいため、調整した
+        // デフォルトの同期頻度（20秒/回）だと、ラグいため調整した
         // SendRate を設定
         PhotonNetwork.SendRate = 60;
         // SerializationRate を設定
@@ -193,8 +193,6 @@ public class DodgeBallScene : MonoBehaviourPunCallbacks
     // ゲームスタート処理を行うコルーチン
     IEnumerator StartGameCoroutine()
     {
-        // これがBチームのプレイヤーもtrueになってる
-        Debug.Log($"Aチーム:{myPlayerScript.isAteam}でスタートします。"); 
         // 自身のプレイヤーオブジェクトの配置設定
         myPlayerScript.SetPosition();
 
@@ -348,6 +346,8 @@ public class DodgeBallScene : MonoBehaviourPunCallbacks
         var roomProperties = new ExitGames.Client.Photon.Hashtable();
         roomProperties["aTeamViewIDs"] = aTeamViewIDs.ToArray();
         roomProperties["bTeamViewIDs"] = bTeamViewIDs.ToArray();
+        // ボール保持者も初期化
+        roomProperties["currentBallHolderViewID"] = -1;
         PhotonNetwork.CurrentRoom.SetCustomProperties(roomProperties);
 
         Debug.Log("AチームのプレイヤーViewID一覧: " + string.Join(", ", aTeamViewIDs));

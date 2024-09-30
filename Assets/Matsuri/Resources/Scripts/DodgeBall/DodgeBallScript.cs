@@ -31,6 +31,8 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
 
     // 最後に投げたプレイヤーのViewID
     public int lastThrownPlayerViewID = -1;
+    // 最後に投げたプレイヤーのスクリプト
+    DodgeBallPlayerScript lastThrownPlayerScript;
 
     // Hit判定が有効かどうかのフラグ
     public bool isHitEnabled = false;
@@ -41,8 +43,8 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
     // ボールの初期位置
     Vector3 initialPosition = new Vector3(0, 1, 0);
 
-    // ボールをリスポーンしたかどうかのフラグ（デフォルトfalse）
-    private bool isBallRespawned = false;
+    // ボールをリスポーンしたかどうかのフラグ（ゲームスタート直後にリスポーンしないように、デフォルトtrue）
+    private bool isBallRespawned = true;
 
     // ボールを持つプレイヤーオブジェクトのTransform
     private Transform ballHolderTransform;
@@ -97,42 +99,71 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
             if ((rb.position.x != initialPosition.x || rb.position.y != initialPosition.y) && !isBallRespawned)
             {
                 // ボールをリスポーンするかのチェック
-                StartCoroutine(ShouldRespawnBall());
+                StartCoroutine(ShouldRespawnBall(ballRespawnTime));
             }
         }
 
-        // プレイヤーに衝突したら
+        // プレイヤーに衝突したとき
         if (collision.gameObject.CompareTag("DodgeBallPlayer"))
         {     
-
-            // 衝突したプレイヤーのenemyViewIDsを取得
+            // 衝突したプレイヤーのスクリプトを取得
             DodgeBallPlayerScript collidingPlayerScript = collision.collider.GetComponent<DodgeBallPlayerScript>();
-            int[] enemyViewIDs = collidingPlayerScript.enemyViewIDs;
 
-            // enemyViewIDs が null の場合（読み込み前）は処理を中断
-            if (enemyViewIDs == null)
+            if (collidingPlayerScript == null)
             {
-                Debug.Log("enemyViewIDs が null です");
+                Debug.LogError("衝突したオブジェクトに DodgeBallPlayerScript が見つかりません。処理を中断します。");
                 return;
             }
 
-            // 衝突したプレイヤーオブジェクトのView取得
+            // 衝突したプレイヤーオブジェクトのPhotonViewを取得
             PhotonView playerView = collision.collider.GetComponent<PhotonView>();
+            // nullチェックを追加
+            if (playerView == null)
+            {
+                Debug.LogError("衝突したオブジェクトに PhotonView が見つかりません。処理を中断します。");
+                return;
+            }
+
+            // 敵チームのプレイヤーオブジェクトのViewID配列
+            int[] enemyViewIDs;
+
+            // ルームプロパティを取得
+            var roomProperties = PhotonNetwork.CurrentRoom.CustomProperties;
+            // 最後にボールを投げたプレイヤーがAチームの場合
+            if(lastThrownPlayerScript.isAteam)
+            {
+                enemyViewIDs = (int[])roomProperties["bTeamViewIDs"];
+            }
+            // 最後にボールを投げたプレイヤーがBチームの場合
+            else
+            {
+                enemyViewIDs = (int[])roomProperties["aTeamViewIDs"];
+            }
 
             // 敵チームのプレイヤーオブジェクトのViewID分、ループする
             foreach (int viewId in enemyViewIDs)
             {
+                // 各条件の詳細なログを追加
+                Debug.Log("現在の enemyViewID: " + viewId);
+                Debug.Log("衝突したプレイヤーの ViewID: " + playerView.ViewID);
+                Debug.Log("isHitEnabled の値: " + isHitEnabled);
+
                 // プレイヤーが投げたボールが、ノーバウンドで、相手チームのプレイヤーに衝突した場合
                 if (viewId == playerView.ViewID && isHitEnabled)
                 {
-                    OnBallHit();
+                    Debug.Log("ノーバウンドで敵プレイヤーにヒットしました！ViewID: " + viewId);
+                    OnBallHit();  // ボールがヒットした際の処理を実行
+                }
+                else
+                {
+                    Debug.LogWarning("ヒット条件が満たされませんでした。ViewID: " + viewId);
                 }
             }
-        }    
+        }
     }
 
     // ボールのリスポーン処理
-    private IEnumerator ShouldRespawnBall()
+    private IEnumerator ShouldRespawnBall(float RespawnTime)
     {
         // ボールのHit判定がない場合
         if (!isHitEnabled)
@@ -140,7 +171,7 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
             // ボールを○○秒後にリスポーンします..のようなカウント表示を入れたい
 
             // 指定秒間待機
-            yield return new WaitForSeconds(ballRespawnTime);
+            yield return new WaitForSeconds(RespawnTime);
 
             // 再度ボールの状態を確認して、ボールのHit判定がない場合
             if (!isHitEnabled)
@@ -156,7 +187,7 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
                 }
 
                 // RPCで全クライアントにリスポーン処理を同期
-                photonView.RPC("RespawnBallRPC", RpcTarget.AllBuffered);
+                photonView.RPC("RespawnBallRPC", RpcTarget.AllViaServer);
             }
         }
     }
@@ -197,22 +228,29 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
         // ルームプロパティを取得
         ExitGames.Client.Photon.Hashtable roomProperties = PhotonNetwork.CurrentRoom.CustomProperties;
 
+        // デバッグログ：ルームプロパティの状態を確認
+        Debug.Log("ルームプロパティを取得しました。");
+
         // プレイヤーのスコアを取得、存在しない場合は初期化
         if (!roomProperties.ContainsKey(lastThrownPlayerViewID))
         {
+            Debug.Log("プレイヤーID " + lastThrownPlayerViewID + " のスコアが見つかりません。スコアを初期化します。");
             roomProperties[lastThrownPlayerViewID] = 0;
         }
 
         // スコアを更新
         int currentScore = (int)roomProperties[lastThrownPlayerViewID];
+        Debug.Log("プレイヤーID " + lastThrownPlayerViewID + " の現在のスコア: " + currentScore);
+        
         roomProperties[lastThrownPlayerViewID] = currentScore + 1;
+        Debug.Log("プレイヤーID " + lastThrownPlayerViewID + " のスコアを更新しました: " + (currentScore + 1));
 
         // ルームプロパティを設定
         PhotonNetwork.CurrentRoom.SetCustomProperties(roomProperties);
+        Debug.Log("ルームプロパティを更新しました。");
 
         // 最後にボールを投げたプレイヤーで、内野に復活するメソッドを実行
-        GameObject lastThrownPlayerObject = PhotonView.Find(lastThrownPlayerViewID).gameObject;
-        DodgeBallPlayerScript lastThrownPlayerScript = lastThrownPlayerObject.GetComponent<DodgeBallPlayerScript>();
+        Debug.Log("プレイヤーViewID： " + lastThrownPlayerViewID + " を内野に復活させます。");
         lastThrownPlayerScript.ReviveInField();
     }
 
@@ -250,7 +288,9 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
     // 所有権の転送が失敗したときに呼び出される
     public void OnOwnershipTransferFailed(PhotonView targetView, Player senderOfFailedRequest)
     {
-        Debug.LogError("ボールの所有権の転送に失敗しました。");
+        Debug.LogError("ボールの所有権の転送に失敗しました。ボールをリスポーンさせます。");
+        // 即時リスポーン
+        StartCoroutine(ShouldRespawnBall(0f));
     }
 
     // ボールをストレートに投げるコルーチン
@@ -275,7 +315,7 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
             rb.position = ballHolderTransform.position + ballHolderTransform.forward * 1f + ballHolderTransform.up * 2f;
 
             // 力の強さ
-            float shootForce = 10.0f;
+            float shootForce = 12.0f;
 
             // 向きと大きさからボールに加わる力を計算する
             Vector3 force = ballHolderTransform.forward.normalized * shootForce;
@@ -333,14 +373,12 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
     {
         // プレイヤーからボールを切り離し
         yield return StartCoroutine(DetachBallFromPlayer());
-
         try
         {
             if (rb == null)
             {
                 Debug.LogError("DropBallで、Rigidbodyが取得できません");
             }
-
             // ボールをプレイヤーの前方1ユニット、高さ1ユニットに配置
             rb.position = ballHolderTransform.position + ballHolderTransform.forward * 1f + ballHolderTransform.up * 2f;
         }
@@ -360,17 +398,51 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
             Debug.LogError($"ViewID:{ballHolderView.ViewID} のプレイヤーのtransformが見つかりません");
         }
 
-        // 最後に投げたプレイヤーのphotonViewIDを取得しておく
-        lastThrownPlayerViewID = ballHolderView.ViewID;
+        // 全てのクライアントに、ボールのHIt判定ありを同期
+        photonView.RPC("HitDetectionRPC", RpcTarget.AllViaServer, true);
 
         // 全てのクライアントに、プレイヤーとボール親子関係の解除を通知
-        photonView.RPC("UnsetBallToPlayer", RpcTarget.AllViaServer);
+        photonView.RPC("StartUnsetBallToPlayerRPC", RpcTarget.AllViaServer, ballHolderView.ViewID);
 
-        // 全てのクライアントに、ボールのHIt判定ありを同期
-        photonView.RPC("HitDetectionRPC", RpcTarget.AllBuffered, true);
+        // 全てのクライアントでのRPC処理が完了してるかのチェック
+        bool allCompleted = false;
 
-        // RPCの完了のため、待機
-        yield return new WaitForSeconds(2.0f);
+        while (!allCompleted)
+        {
+            allCompleted = true;  // 一度 true に設定してからチェック
+
+            foreach (Player player in PhotonNetwork.PlayerList)
+            {
+                if (player.CustomProperties.ContainsKey("UnsetCompleted_" + player.ActorNumber))
+                {
+                    if ((bool)player.CustomProperties["UnsetCompleted_" + player.ActorNumber] == false)
+                    {
+                        allCompleted = false;
+                        break;
+                    }
+                }
+                else
+                {
+                    allCompleted = false;
+                    break;
+                }
+            }
+
+            if (!allCompleted)
+            {
+                Debug.Log("まだ全クライアントの親子関係解除が完了していません。");
+                yield return new WaitForSeconds(0.5f);  // 0.5秒待機して再チェック
+            }
+        }
+        Debug.Log("全クライアントが親子関係の解除を完了しました");
+
+        // ルームプロパティのボール保持者をリセット（-1にする）
+        ExitGames.Client.Photon.Hashtable roomProperties = PhotonNetwork.CurrentRoom.CustomProperties;
+        roomProperties["currentBallHolderViewID"] = -1;
+        PhotonNetwork.CurrentRoom.SetCustomProperties(roomProperties);
+
+        // さらに待機
+        yield return new WaitForSeconds(0.5f);
 
         // ボールの物理挙動を有効にする
         yield return StartCoroutine(ToggleKinematicState(false, null));
@@ -424,9 +496,41 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
     }
     
     // RPCで他のクライアントに、ボールの親子関係の解除を反映
-    // PhotonTransformViewは主に位置（Position）、回転（Rotation）、およびスケール（Scale）を同期するために設計されていますが、親子関係（Parenting）自体の同期は行わないので、このRPCは必須。
     [PunRPC]
-    void UnsetBallToPlayer()
+    void StartUnsetBallToPlayerRPC(int ballHolderViewID)
+    {
+        // コルーチンを開始
+        StartCoroutine(UnsetBallToPlayer());
+
+        // 最後に投げたプレイヤーのphotonViewIDを取得しておく
+        lastThrownPlayerViewID = ballHolderViewID;
+
+        // 最後にボールを投げたプレイヤーを取得
+        PhotonView lastThrownPlayerPhotonView = PhotonView.Find(lastThrownPlayerViewID);
+        if (lastThrownPlayerPhotonView == null)
+        {
+            Debug.LogError("プレイヤーID " + lastThrownPlayerViewID + " に対応する PhotonView が見つかりません。処理を中断します。");
+            return;
+        }
+
+        GameObject lastThrownPlayerObject = lastThrownPlayerPhotonView.gameObject;
+        if (lastThrownPlayerObject == null)
+        {
+            Debug.LogError("プレイヤーID " + lastThrownPlayerViewID + " に対応する GameObject が見つかりません。処理を中断します。");
+            return;
+        }
+
+        // プレイヤーのスクリプトを取得
+        lastThrownPlayerScript = lastThrownPlayerObject.GetComponent<DodgeBallPlayerScript>();
+        if (lastThrownPlayerScript == null)
+        {
+            Debug.LogError("プレイヤーID " + lastThrownPlayerViewID + " に対応する DodgeBallPlayerScript が見つかりません。処理を中断します。");
+            return;
+        }
+    }
+
+    // ボールの親子関係解除のコルーチン
+    IEnumerator UnsetBallToPlayer()
     {        
         Debug.Log("ボールの親子関係を解除します");
 
@@ -434,12 +538,26 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
         if (transform.parent != null)
         {
             transform.parent = null;  // 親オブジェクトとのリンクを解除
-            Debug.Log("ボールの親子関係を解除しました");
+
+            // 解除されるまでチェック
+            while (transform.parent != null)
+            {
+                yield return null; // 1フレーム待機
+                Debug.LogError("まだ親子関係が解除されていません。再確認中...");
+            }
+
+            Debug.Log("親子関係の解除が確認されました");
         }
         else
         {
             Debug.LogWarning("ボールの親子関係はすでに解除されています");
         }
+
+        // カスタムプロパティを使用
+        ExitGames.Client.Photon.Hashtable customProperties = new ExitGames.Client.Photon.Hashtable();
+        // このクライアントでの処理完了を通知
+        customProperties["UnsetCompleted_" + PhotonNetwork.LocalPlayer.ActorNumber] = true;
+        PhotonNetwork.LocalPlayer.SetCustomProperties(customProperties);
     }
 
     // RPCで他のクライアントに、ボールの親子関係の追加する

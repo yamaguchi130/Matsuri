@@ -1,6 +1,6 @@
 using System.Collections;
 using UnityEngine;
-using UnityEngine.SceneManagement;
+
 using Photon.Pun;
 using Photon.Realtime;
 
@@ -30,14 +30,8 @@ public class DodgeBallFinalScore : MonoBehaviourPunCallbacks
         // 15秒後に実行したい処理をここに書く
         Debug.Log(sleepMinutes.ToString() + "秒スリープしました");
 
-        // メインメニューに戻る
-        BackScene("MainMenu");
-    }
-
-    // 特定のシーンに戻る
-    private void BackScene(string sceneName) {
-        // メインメニューシーンを同期的にロードする
-        SceneManager.LoadScene(sceneName);
-        Debug.Log($"{sceneName}のシーンに戻ります。");
+        // ルームの退室
+        PhotonNetwork.LeaveRoom();
+        Debug.Log("ルームを退室します。");
     }
 }
