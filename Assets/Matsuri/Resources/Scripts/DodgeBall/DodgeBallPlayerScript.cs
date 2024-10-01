@@ -478,8 +478,13 @@ public class DodgeBallPlayerScript : MonoBehaviourPunCallbacks
         ballView.RPC("SetBallToPlayer", RpcTarget.AllViaServer, photonView.ViewID);
 
         // SetBallToPlayerの完了のため、待機
-        yield return new WaitForSeconds(0.5f);
-        
+        yield return new WaitForSeconds(1f);
+
+　　　　// ちょっとタイミングが遅く、ボールが転がってしまうので見直し中
+        Rigidbody ballRb = ballView.GetComponent<Rigidbody>();
+        // ボールの位置と回転の制御をロック
+        ballRb.constraints = RigidbodyConstraints.FreezePosition | RigidbodyConstraints.FreezeRotation;
+
         // ボールを持っているパネルを表示
         photonView.RPC("UpdatePanelVisibility", photonView.Owner, true);
 
@@ -511,15 +516,48 @@ public class DodgeBallPlayerScript : MonoBehaviourPunCallbacks
     public void StartStraightThrowCoroutine()
     {
         Debug.Log("ストレートのコルーチンを開始します。");
-        // Todo たまにNULLになる
-        StartCoroutine(ballScript.StraightThrowBall());
+
+        // PhotonViewのチェックを行い、自分のプレイヤーでのみコルーチンを実行
+        if (photonView.IsMine)
+        {
+            // ボールスクリプトがnullになっている可能性を考慮してチェック
+            if (ballScript != null)
+            {
+                StartCoroutine(ballScript.StraightThrowBall());
+            }
+            else
+            {
+                Debug.LogWarning("ballScriptがnullです。");
+            }
+        }
+        else
+        {
+            Debug.Log("このプレイヤーはローカルではないため、コルーチンは実行されません。");
+        }
     }
 
     // lobPassのアニメーションイベントで実行されるメソッド
     public void StartLobPassCoroutine()
     {
         Debug.Log("山なりパスのコルーチンを開始します。");
-        StartCoroutine(ballScript.LobPass());
+
+        // PhotonViewのチェックを行い、自分のプレイヤーでのみコルーチンを実行
+        if (photonView.IsMine)
+        {
+            // ボールスクリプトがnullになっている可能性を考慮してチェック
+            if (ballScript != null)
+            {
+                StartCoroutine(ballScript.LobPass());
+            }
+            else
+            {
+                Debug.LogWarning("ballScriptがnullです。");
+            }
+        }
+        else
+        {
+            Debug.Log("このプレイヤーはローカルではないため、コルーチンは実行されません。");
+        }
     }
 
     // キャッチボタン押下中

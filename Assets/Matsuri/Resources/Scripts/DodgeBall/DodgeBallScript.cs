@@ -441,8 +441,8 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
         roomProperties["currentBallHolderViewID"] = -1;
         PhotonNetwork.CurrentRoom.SetCustomProperties(roomProperties);
 
-        // さらに待機
-        yield return new WaitForSeconds(0.5f);
+        // プレイヤーの動きを全クライアントに同期するまで待機
+        yield return new WaitForSeconds(1f);
 
         // ボールの物理挙動を有効にする
         yield return StartCoroutine(ToggleKinematicState(false, null));
@@ -476,8 +476,6 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
         // trueなら
         if(enable)
         {
-            // ボールの位置と回転の制御をロック
-            rb.constraints = RigidbodyConstraints.FreezePosition | RigidbodyConstraints.FreezeRotation;
             // ボールのバウンドを無効
             ballCol.material.bounciness = 0f;
             // ボールと、ボールを持っているプレイヤーの衝突を無視する
@@ -537,7 +535,8 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
         // ボールとプレイヤーの親子関係を解除
         if (transform.parent != null)
         {
-            transform.parent = null;  // 親オブジェクトとのリンクを解除
+            // 親子関係を解除する前にボールの位置をワールド座標に変換
+            transform.SetParent(null, true); // 第二引数trueで、ワールド座標を保持
 
             // 解除されるまでチェック
             while (transform.parent != null)
@@ -581,7 +580,11 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
             Debug.LogError("右手のボーンが見つかりません");
         }
 
-        // ボール位置を、右の手のひらに設定(親オブジェクトに追従させるので、ローカル座標にする)
+        // 右手のひら＞ボールの親子関係を設定（手のひらに、ボールを追従させるため、ローカル座標にする）
         transform.SetParent(rightHandBone, false);
+
+        // ボールのローカル座標と回転をリセットして、手のひらの中心に合わせる
+        transform.localPosition = Vector3.zero;
+        transform.localRotation = Quaternion.identity;
     }
 }

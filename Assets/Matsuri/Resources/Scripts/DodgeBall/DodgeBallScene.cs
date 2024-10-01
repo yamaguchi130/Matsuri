@@ -62,7 +62,6 @@ public class DodgeBallScene : MonoBehaviourPunCallbacks
     // ボールのスクリプト
     DodgeBallScript ballScript;
 
-
     // プレイヤーオブジェクトをランダムにAチームとBチームに分ける為のリスト
     List<int> aTeamViewIDs = new List<int>();
     List<int> bTeamViewIDs = new List<int>();

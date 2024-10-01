@@ -61,6 +61,13 @@ public class DodgeBallScore : MonoBehaviourPunCallbacks
         {
             PhotonView view = PhotonView.Find(viewId);
 
+            // viewが見つからない場合
+            if (view == null)
+            {
+                Debug.LogWarning($"ViewID:{viewId}に対応するPhotonViewが見つかりませんでした。");
+                continue;
+            }
+
             // オブジェクトのviewのオーナーが存在しない場合
             if (view.Owner == null)
             {
