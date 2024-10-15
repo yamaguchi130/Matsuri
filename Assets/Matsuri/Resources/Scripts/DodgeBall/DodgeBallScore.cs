@@ -25,16 +25,14 @@ public class DodgeBallScore : MonoBehaviourPunCallbacks
     // ゲームが開始してるかどうかのフラグ
 	public bool isStartGame = false;
 
+    // viewID、プレイヤーネーム、プレイヤースコアを格納する辞書
+    private Dictionary<int, KeyValuePair<string, int>> playerInfoDictionary = new Dictionary<int, KeyValuePair<string, int>>();
+
     // スクリプトが有効になってから、最初のフレームの更新が行われる前に呼び出し
     void Start()
     {
        scoreTmp = GetComponentInChildren<TextMeshProUGUI>();
     }
-
-    // スコア更新
-    void Update()
-    {}
-
 
     // ルームプロパティに変更があれば、呼ばれる
     public override void OnRoomPropertiesUpdate(ExitGames.Client.Photon.Hashtable propertiesThatChanged)
@@ -52,8 +50,16 @@ public class DodgeBallScore : MonoBehaviourPunCallbacks
             return;
         }
 
+        // チームごとのViewIDsをルームプロパティから取得
+        int[] aTeamViewIDs = (int[])PhotonNetwork.CurrentRoom.CustomProperties["aTeamViewIDs"];
+        int[] bTeamViewIDs = (int[])PhotonNetwork.CurrentRoom.CustomProperties["bTeamViewIDs"];
+
         // スコアをクリア
-        playerScores.Clear();
+        playerInfoDictionary.Clear();
+
+        // AチームとBチームのスコア合計を保持する変数
+        int aTeamTotalScore = 0;
+        int bTeamTotalScore = 0;
 
         // ルームプロパティからスコアを取得
         int[] ids = (int[])playerObjectIDs;
@@ -80,33 +86,69 @@ public class DodgeBallScore : MonoBehaviourPunCallbacks
             {
                 string playerName = view.Owner.NickName;
                 int playerScore = (int)scoreValue;
-                playerScores.Add(new KeyValuePair<string, int>(playerName, playerScore));
+
+                // 辞書にviewID、プレイヤーネーム、プレイヤースコアを追加
+                playerInfoDictionary[viewId] = new KeyValuePair<string, int>(playerName, playerScore);
+
+                // チームを判別し、チームごとのスコアに加算
+                if (aTeamViewIDs.Contains(viewId))
+                {
+                    aTeamTotalScore += playerScore; // Aチームの合計スコアを加算
+                }
+                else if (bTeamViewIDs.Contains(viewId))
+                {
+                    bTeamTotalScore += playerScore; // Bチームの合計スコアを加算
+                }
             }
         }
 
-        // スコアの辞書をテキストオブジェクトに反映 
-        scoreTmp.text = "得点\n";
+        // スコアテキストの初期化
+        scoreTmp.text = "スコアボード\n";
 
-        // entry.Valueを降順でソートする
-        playerScores.Sort((pair1, pair2) => pair2.Value.CompareTo(pair1.Value));
-
-        // スコアテキストを更新
-        foreach (KeyValuePair<string, int> entry in playerScores)
+        // Aチームのスコア表示
+        scoreTmp.text += "Aチーム合計スコア: " + aTeamTotalScore + "点\n";
+        scoreTmp.text += "個人スコア:\n";
+        foreach (int viewId in aTeamViewIDs)
         {
-            scoreTmp.text += $"{entry.Key}: {entry.Value}点\n";
+            if (playerInfoDictionary.ContainsKey(viewId))
+            {
+                var playerInfo = playerInfoDictionary[viewId];
+                scoreTmp.text += $"{playerInfo.Key}: {playerInfo.Value}点\n";
+            }
         }
+
+        // Bチームのスコア表示
+        scoreTmp.text += "\nBチーム合計スコア: " + bTeamTotalScore + "点\n";
+        scoreTmp.text += "個人スコア:\n";
+        foreach (int viewId in bTeamViewIDs)
+        {
+            if (playerInfoDictionary.ContainsKey(viewId))
+            {
+                var playerInfo = playerInfoDictionary[viewId];
+                scoreTmp.text += $"{playerInfo.Key}: {playerInfo.Value}点\n";
+            }
+        }
+
+        // デバッグログに結果を表示
+        Debug.Log($"Aチーム合計スコア: {aTeamTotalScore}, Bチーム合計スコア: {bTeamTotalScore}");
     }
 
     // 最終スコア集計
-    public void SummaryScore(int timeLimitSeconds) {
-        // プレイヤーのインデックスを取得
-        int rank = playerScores.FindIndex(e => e.Key == PhotonNetwork.LocalPlayer.NickName);
-        
-        // プレイヤーが見つからない場合は処理を終了
-        if (rank == -1) return;
+    public void SummaryScore(int timeLimitSeconds)
+    {
+        // ローカルプレイヤーのviewIDを取得
+        int localPlayerViewID = PhotonNetwork.LocalPlayer.ActorNumber; // ローカルプレイヤーのviewIDを取得
 
-        // プレイヤーのスコアを取得
-        int playerScore = playerScores[rank].Value;
+        // プレイヤーのviewIDが辞書に存在するか確認
+        if (!playerInfoDictionary.ContainsKey(localPlayerViewID)) 
+        {
+            Debug.LogWarning("ローカルプレイヤーのスコアが見つかりません。");
+            return;
+        }
+
+        // プレイヤーのスコアとランクを取得
+        string localPlayerName = PhotonNetwork.LocalPlayer.NickName;
+        int playerScore = playerInfoDictionary[localPlayerViewID].Value;
 
         // ランキングに応じた基準値
         float[] rankingStandardValueArray = new float[] {1f, 0.86f, 0.72f, 0.58f, 0.44f, 0.30f};
@@ -114,8 +156,18 @@ public class DodgeBallScore : MonoBehaviourPunCallbacks
         // スコア調整係数（この値は調整が必要）
         float scoreAdjustmentFactor = 100.0f; // 生存時間をスケールアップするための係数
 
+        // ソートされたプレイヤースコアのリストを作成
+        var sortedScores = playerInfoDictionary.OrderByDescending(pair => pair.Value.Value).ToList();
+
+        // ランクを取得
+        int rank = sortedScores.FindIndex(e => e.Key == localPlayerViewID);
+
         // ランキングの範囲外の場合は処理を終了
-        if (rank >= rankingStandardValueArray.Length) return;
+        if (rank >= rankingStandardValueArray.Length)
+        {
+            Debug.LogWarning("ランクが基準値配列の範囲外です。");
+            return;
+        }
 
         // 自分の生存時間を算出
         int timeSurvived = timeLimitSeconds - playerScore;
@@ -128,17 +180,21 @@ public class DodgeBallScore : MonoBehaviourPunCallbacks
         int adjustedGamePoints = (int)gamePoints;
 
         // Playfabのアカウントにポイント付与
-        AddPointsToPlayfabAccount(PhotonNetwork.LocalPlayer.NickName, adjustedGamePoints);
+        AddPointsToPlayfabAccount(localPlayerName, adjustedGamePoints);
 
         // 最終スコアパネルを表示する
         finalScorePanel.SetActive(true);
         TextMeshProUGUI finalScoreText = finalScorePanel.GetComponentInChildren<TextMeshProUGUI>();
-        
+
         // 最終スコアテキストを設定
-        finalScoreText.text = "あなたの獲得ポイント：" + adjustedGamePoints.ToString();
-        foreach (KeyValuePair<string, int> entry in playerScores)
+        finalScoreText.text = "あなたの獲得ポイント：" + adjustedGamePoints.ToString() + "\n";
+
+        // 全プレイヤーのスコアを表示
+        foreach (var entry in sortedScores)
         {
-            finalScoreText.text += $"{entry.Key}: {entry.Value}点\n";
+            string playerName = entry.Value.Key;
+            int score = entry.Value.Value;
+            finalScoreText.text += $"{playerName}: {score}点\n";
         }
     }
 
