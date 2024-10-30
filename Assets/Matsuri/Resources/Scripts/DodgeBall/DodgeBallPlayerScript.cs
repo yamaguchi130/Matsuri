@@ -445,10 +445,6 @@ public class DodgeBallPlayerScript : MonoBehaviourPunCallbacks
             yield break;
         }
 
-        Rigidbody ballRb = ballView.GetComponent<Rigidbody>();
-        // ボールの位置と回転の制御をロック
-        ballRb.constraints = RigidbodyConstraints.FreezePosition | RigidbodyConstraints.FreezeRotation;
-
         // ルームプロパティを取得
         var roomProperties = PhotonNetwork.CurrentRoom.CustomProperties;
         // ボール保持者がいない場合
@@ -477,6 +473,8 @@ public class DodgeBallPlayerScript : MonoBehaviourPunCallbacks
 
         // 物理挙動を無効にする
         StartCoroutine(ballScript.ToggleKinematicState(true, playerCol));
+
+        Rigidbody ballRb = ballView.GetComponent<Rigidbody>();
 
         // 全てのクライアントに親子関係の追加を通知
         ballView.RPC("SetBallToPlayer", RpcTarget.AllViaServer, photonView.ViewID);
