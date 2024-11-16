@@ -471,19 +471,16 @@ public class DodgeBallPlayerScript : MonoBehaviourPunCallbacks
             yield return new WaitUntil(() => ballView.IsMine);
         }
 
-        // 物理挙動を無効にする
-        StartCoroutine(ballScript.ToggleKinematicState(true, playerCol));
-
         Rigidbody ballRb = ballView.GetComponent<Rigidbody>();
+        ballRb.isKinematic = true;
 
         // 全てのクライアントに親子関係の追加を通知
         ballView.RPC("SetBallToPlayer", RpcTarget.AllViaServer, photonView.ViewID);
 
-        // SetBallToPlayerの完了のため、待機
-        yield return new WaitForSeconds(1f);
-
         // ボールを持っているパネルを表示
         photonView.RPC("UpdatePanelVisibility", photonView.Owner, true);
+
+        yield return new WaitForSeconds(0.1f); // 待機（通信反映待ち）
 
         Debug.Log($"{PhotonNetwork.LocalPlayer.UserId} が、ボールを所持しました");
     }

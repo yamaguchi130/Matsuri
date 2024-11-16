@@ -411,109 +411,25 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
         // 全てのクライアントに、プレイヤーとボール親子関係の解除を通知
         photonView.RPC("StartUnsetBallToPlayerRPC", RpcTarget.AllViaServer, ballHolderView.ViewID);
 
-        // 全てのクライアントでのRPC処理が完了してるかのチェック（機能してないので修正）
-        bool allCompleted = false;
-
-       while (!allCompleted)
-        {
-            allCompleted = true;  // 一度 true に設定してからチェック
-
-            try
-            {
-                foreach (Player player in PhotonNetwork.PlayerList)
-                {
-                    string propertyKey = "UnFreezePositionAndRotationCompleted_" + player.ActorNumber;
-
-                    if (player.CustomProperties.ContainsKey(propertyKey))
-                    {
-                        if (!(bool)player.CustomProperties[propertyKey])
-                        {
-                            allCompleted = false;
-                            break;
-                        }
-                    }
-                    else
-                    {
-                        Debug.LogWarning($"Player {player.ActorNumber} のカスタムプロパティにキー {propertyKey} が見つかりません。");
-                        allCompleted = false;
-                        break;
-                    }
-                }
-            }
-            catch (System.InvalidCastException e)
-            {
-                Debug.LogError($"プロパティの値を bool にキャストできませんでした: {e.Message}");
-                allCompleted = false;
-            }
-            catch (System.Exception e)
-            {
-                Debug.LogError($"不明なエラーが発生しました: {e.Message}");
-                allCompleted = false;
-            }
-
-            if (!allCompleted)
-            {
-                Debug.Log("まだ全クライアントの親子関係解除が完了していません。");
-                yield return new WaitForSeconds(0.5f);  // 0.5秒待機して再チェック
-            }
-        }
-
-        Debug.Log("全クライアントが親子関係の解除を完了しました");
-
         // ルームプロパティのボール保持者をリセット（-1にする）
         ExitGames.Client.Photon.Hashtable roomProperties = PhotonNetwork.CurrentRoom.CustomProperties;
         roomProperties["currentBallHolderViewID"] = -1;
         PhotonNetwork.CurrentRoom.SetCustomProperties(roomProperties);
 
         // ボールの物理挙動を有効にする
-        yield return StartCoroutine(ToggleKinematicState(false, null));
-        
-        // プレイヤーの動きを全クライアントに同期するまで待機
-        yield return new WaitForSeconds(2f);
+        rb.isKinematic = false;
 
         // ボールを持ってないパネルを表示
         ballHolderView.RPC("UpdatePanelVisibility", ballHolderView.Owner, false);
 
         // ボールを未リスポーンに設定
         isBallRespawned = false;
+
+        yield return new WaitForSeconds(0.1f); // 待機（通信反映待ち）
+
+        Debug.Log($"{PhotonNetwork.LocalPlayer.UserId} から、ボールを取り外しました");
     }
 
-    // Rigidbodyの物理挙動を有効化または無効化する(falseなら物理挙動有効/trueなら物理挙動無効)
-    public IEnumerator ToggleKinematicState(bool enable, Collider ballHolderPlayerCol)
-    {        
-        // ballHolderPlayerColがnullの場合、前回のballHolderPlayerColを使う
-        if (ballHolderPlayerCol == null)
-        {
-            ballHolderPlayerCol = previousPlayerCol;  // 前回のColliderを使用
-            if (ballHolderPlayerCol == null)
-            {
-                Debug.LogError("前回のColliderも存在しません");
-                yield break;  // 何もできないので処理を終了
-            }
-        }
-        else
-        {
-            // playerColが渡された場合は、保存しておく
-            previousPlayerCol = ballHolderPlayerCol;
-        }
-
-        // trueなら
-        if(enable)
-        {
-            // ボールのバウンドを無効
-            ballCol.material.bounciness = 0f;
-            // ボールと、ボールを持っているプレイヤーの衝突を無視する
-            Physics.IgnoreCollision(ballCol, ballHolderPlayerCol, enable);
-        }
-        // false/物理挙動有効にするなら
-        else
-        {
-            // ボールのバウンドを有効（デフォルト:1）
-            ballCol.material.bounciness = 1f;
-            // ボールと、ボールを持っているプレイヤーの衝突を無視しない（デフォルト）
-            Physics.IgnoreCollision(ballCol, ballHolderPlayerCol, enable);
-        };
-    }
     
     // RPCで他のクライアントに、ボールの親子関係の解除を反映
     [PunRPC]
@@ -528,30 +444,9 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
     {        
         Debug.Log("ボールの親子関係を解除します");
 
-        // ボールの位置と回転を固定を解除
-        Rigidbody ballRigidbody = photonView.GetComponent<Rigidbody>();
-        ballRigidbody.constraints = RigidbodyConstraints.None;
+        transform.SetParent(null, true); // 第二引数trueで、ワールド座標を保持
+        yield return null; // 1フレーム待機（反映まち）
 
-        // ボールとプレイヤーの親子関係を解除
-        if (transform.parent != null)
-        {
-            // 親子関係を解除する前にボールの位置をワールド座標に変換
-            transform.SetParent(null, true); // 第二引数trueで、ワールド座標を保持
-
-            // 解除されるまでチェック
-            while (transform.parent != null)
-            {
-                yield return null; // 1フレーム待機
-                Debug.LogError("まだ親子関係が解除されていません。再確認中...");
-            }
-
-            Debug.Log("親子関係の解除が確認されました");
-        }
-        else
-        {
-            Debug.LogWarning("ボールの親子関係はすでに解除されています");
-        }
-        
         // 最後に投げたプレイヤーのphotonViewIDを取得しておく
         lastThrownPlayerViewID = ballHolderViewID;
 
@@ -563,26 +458,21 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
             yield break;
         }
 
-        GameObject lastThrownPlayerObject = lastThrownPlayerPhotonView.gameObject;
-        if (lastThrownPlayerObject == null)
-        {
-            Debug.LogError("プレイヤーID " + lastThrownPlayerViewID + " に対応する GameObject が見つかりません。処理を中断します。");
-            yield break;
-        }
+        // ボールと、ボールを持っているプレイヤーの衝突を検知する（デフォルト）
+        Collider ballHolderPlayerCol = lastThrownPlayerPhotonView.GetComponent<Collider>();
+        Physics.IgnoreCollision(ballCol, ballHolderPlayerCol, false);
+
+        // ボールのバウンドを有効（デフォルト:1）
+        ballCol.material.bounciness = 1f;
 
         // プレイヤーのスクリプトを取得
-        lastThrownPlayerScript = lastThrownPlayerObject.GetComponent<DodgeBallPlayerScript>();
+        lastThrownPlayerScript = lastThrownPlayerPhotonView.GetComponent<DodgeBallPlayerScript>();
         if (lastThrownPlayerScript == null)
         {
             Debug.LogError("プレイヤーID " + lastThrownPlayerViewID + " に対応する DodgeBallPlayerScript が見つかりません。処理を中断します。");
-            yield break;
         }
 
-        // カスタムプロパティを使用
-        ExitGames.Client.Photon.Hashtable customProperties = new ExitGames.Client.Photon.Hashtable();
-        // このクライアントでの処理完了を通知
-        customProperties["UnFreezePositionAndRotationCompleted_" + PhotonNetwork.LocalPlayer.ActorNumber] = true;
-        PhotonNetwork.LocalPlayer.SetCustomProperties(customProperties);
+        yield break;
     }
 
     // RPCで他のクライアントに、ボールの親子関係の追加する
@@ -591,15 +481,8 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
     {
         Debug.Log($"ViewID:{ballHolderViewId}にボールの親子関係を設定します");
 
-        Rigidbody ballRigidbody = photonView.GetComponent<Rigidbody>();
-
-        // ボールの位置と回転を固定
-        ballRigidbody.constraints = RigidbodyConstraints.FreezePosition | RigidbodyConstraints.FreezeRotation;
-    
-        // 回転を初期状態にリセット
-        ballRigidbody.rotation = Quaternion.identity;
-        // 回転速度もリセット
-        ballRigidbody.angularVelocity = Vector3.zero;
+        // ボールのバウンドを無効
+        ballCol.material.bounciness = 0f;
 
         // 対象のプレイヤーのViewを取得
         ballHolderView = PhotonView.Find(ballHolderViewId);
@@ -607,6 +490,10 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
         {
             Debug.LogError($"ViewID:{ballHolderViewId} のプレイヤーが見つかりません");
         }
+
+        // ボールと、ボールを持っているプレイヤーの衝突を無視する（rigidbodyを無効にしても、衝突によりプレイヤーが後ずさりしてしまうため）
+        Collider ballHolderPlayerCol = ballHolderView.GetComponent<Collider>();
+        Physics.IgnoreCollision(ballCol, ballHolderPlayerCol, true);
 
         // 対象のプレイヤーの右手のボーンを見つける
         Transform rightHandBone = ballHolderView.transform.Find("mixamorig6:Hips/mixamorig6:Spine/mixamorig6:Spine1/mixamorig6:Spine2/mixamorig6:RightShoulder/mixamorig6:RightArm/mixamorig6:RightForeArm/mixamorig6:RightHand");
@@ -617,5 +504,7 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
 
         // 右手のひら＞ボールの親子関係を設定（手のひらに、ボールを追従させるため、ローカル座標にする）
         transform.SetParent(rightHandBone, false);
+        // ボールの位置ずれを解消する
+
     }
 }
