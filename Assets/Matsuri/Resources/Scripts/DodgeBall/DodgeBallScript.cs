@@ -38,7 +38,7 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
     public bool isHitEnabled = false;
 
     // ボールのリスポーン時間(秒)
-    float ballRespawnTime = 10f;
+    float ballRespawnTime = 5f;
 
     // ボールの初期位置
     Vector3 initialPosition = new Vector3(0, 1, 0);
@@ -444,8 +444,8 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
     {        
         Debug.Log("ボールの親子関係を解除します");
 
+        // ボールの親子関係を解除
         transform.SetParent(null, true); // 第二引数trueで、ワールド座標を保持
-        yield return null; // 1フレーム待機（反映まち）
 
         // 最後に投げたプレイヤーのphotonViewIDを取得しておく
         lastThrownPlayerViewID = ballHolderViewID;
@@ -502,9 +502,7 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
             Debug.LogError("右手のボーンが見つかりません");
         }
 
-        // 右手のひら＞ボールの親子関係を設定（手のひらに、ボールを追従させるため、ローカル座標にする）
+        // 右手のボーン＞ボールの親子関係を設定（ローカル座標にする）
         transform.SetParent(rightHandBone, false);
-        // ボールの位置ずれを解消する
-
     }
 }

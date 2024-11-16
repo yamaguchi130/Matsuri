@@ -471,8 +471,9 @@ public class DodgeBallPlayerScript : MonoBehaviourPunCallbacks
             yield return new WaitUntil(() => ballView.IsMine);
         }
 
+        // ボールのRigidbodyを取得して停止
         Rigidbody ballRb = ballView.GetComponent<Rigidbody>();
-        ballRb.isKinematic = true;
+        ballRb.isKinematic = true; // 物理演算を無効にする
 
         // 全てのクライアントに親子関係の追加を通知
         ballView.RPC("SetBallToPlayer", RpcTarget.AllViaServer, photonView.ViewID);
