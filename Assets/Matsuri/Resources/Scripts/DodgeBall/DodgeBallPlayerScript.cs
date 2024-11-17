@@ -483,8 +483,6 @@ public class DodgeBallPlayerScript : MonoBehaviourPunCallbacks
         // ボールを持っているパネルを表示
         photonView.RPC("UpdatePanelVisibility", photonView.Owner, true);
 
-        yield return new WaitForSeconds(0.1f); // 待機（通信反映待ち）
-
         Debug.Log($"{PhotonNetwork.LocalPlayer.UserId} が、ボールを所持しました");
     }
 
