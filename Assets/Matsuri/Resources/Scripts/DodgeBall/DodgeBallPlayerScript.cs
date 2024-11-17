@@ -473,6 +473,8 @@ public class DodgeBallPlayerScript : MonoBehaviourPunCallbacks
 
         // ボールのRigidbodyを取得して停止
         Rigidbody ballRb = ballView.GetComponent<Rigidbody>();
+        ballRb.velocity = Vector3.zero; // 速度をリセット
+        ballRb.angularVelocity = Vector3.zero; // 回転速度をリセット
         ballRb.isKinematic = true; // 物理演算を無効にする
 
         // 全てのクライアントに親子関係の追加を通知

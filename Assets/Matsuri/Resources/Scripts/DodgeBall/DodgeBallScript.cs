@@ -361,7 +361,7 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
             Vector3 forceDirection = (ballHolderTransform.forward + ballHolderTransform.up).normalized;
 
             // 力の強さ
-            float shootForce = 8.0f;
+            float shootForce = 12.0f;
 
             // 向きと大きさからボールに加わる力を計算する
             Vector3 force = forceDirection * shootForce;
@@ -418,6 +418,8 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
 
         // ボールの物理挙動を有効にする
         rb.isKinematic = false;
+        rb.velocity = Vector3.zero; // 前の速度をリセット
+        rb.angularVelocity = Vector3.zero; // 前の回転速度をリセット
 
         // ボールを持ってないパネルを表示
         ballHolderView.RPC("UpdatePanelVisibility", ballHolderView.Owner, false);
@@ -502,7 +504,7 @@ public class DodgeBallScript : MonoBehaviourPun, IPunOwnershipCallbacks
             Debug.LogError("右手のボーンが見つかりません");
         }
 
-        // 右手のボーン＞ボールの親子関係を設定（ローカル座標にする）
-        transform.SetParent(rightHandBone, false);
+        // 右手のボーン＞ボールの親子関係を設定（ワールド座標保持）
+        transform.SetParent(rightHandBone, true);
     }
 }
